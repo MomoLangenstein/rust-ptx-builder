@@ -1,8 +1,9 @@
 use semver::{Version, VersionReq};
 
-use crate::error::*;
+use crate::error::Result;
 
 pub mod runner;
+#[allow(clippy::module_name_repetitions)]
 pub use self::runner::{ExecutableRunner, Output};
 
 /// Details and requirements for executables.
@@ -56,7 +57,7 @@ impl Executable for Cargo {
         // https://github.com/steveklabnik/semver/issues/105
 
         self::runner::parse_executable_version(self).map(|mut version| {
-            version.pre = vec![];
+            version.pre = semver::Prerelease::EMPTY;
             version
         })
     }

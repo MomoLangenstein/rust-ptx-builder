@@ -1,14 +1,15 @@
-use std::env;
-use std::env::current_dir;
-use std::fs::{remove_dir_all, File};
-use std::io::prelude::*;
-use std::path::PathBuf;
+use std::{
+    env,
+    env::current_dir,
+    fs::{remove_dir_all, File},
+    io::prelude::*,
+    path::PathBuf,
+};
 
 use antidote::Mutex;
 use lazy_static::*;
 
-use ptx_builder::error::*;
-use ptx_builder::prelude::*;
+use ptx_builder::{error::*, prelude::*};
 
 lazy_static! {
     static ref ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -16,9 +17,10 @@ lazy_static! {
 
 #[test]
 fn should_provide_output_path() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
@@ -28,7 +30,7 @@ fn should_provide_output_path() {
                     .join("ptx-builder-0.5")
                     .join("sample_ptx_crate"),
             ));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -36,9 +38,10 @@ fn should_provide_output_path() {
 
 #[test]
 fn should_write_assembly() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
@@ -56,7 +59,7 @@ fn should_write_assembly() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -64,9 +67,10 @@ fn should_write_assembly() {
 
 #[test]
 fn should_build_application_crate() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/app-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
@@ -84,7 +88,7 @@ fn should_build_application_crate() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -92,9 +96,10 @@ fn should_build_application_crate() {
 
 #[test]
 fn should_build_mixed_crate_lib() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/mixed-crate").unwrap();
 
     match builder
@@ -119,7 +124,7 @@ fn should_build_mixed_crate_lib() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -127,9 +132,10 @@ fn should_build_mixed_crate_lib() {
 
 #[test]
 fn should_build_mixed_crate_bin() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/mixed-crate").unwrap();
 
     match builder
@@ -154,7 +160,7 @@ fn should_build_mixed_crate_bin() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -162,9 +168,10 @@ fn should_build_mixed_crate_bin() {
 
 #[test]
 fn should_handle_rebuild_without_changes() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = {
         Builder::new("tests/fixtures/app-crate")
             .unwrap()
@@ -188,7 +195,7 @@ fn should_handle_rebuild_without_changes() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -196,9 +203,10 @@ fn should_handle_rebuild_without_changes() {
 
 #[test]
 fn should_write_assembly_in_debug_mode() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder
@@ -221,7 +229,7 @@ fn should_write_assembly_in_debug_mode() {
                 .contains("debug"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -229,9 +237,10 @@ fn should_write_assembly_in_debug_mode() {
 
 #[test]
 fn should_report_about_build_failure() {
+    let _lock = ENV_MUTEX.lock();
+
     cleanup_temp_location();
 
-    let _lock = ENV_MUTEX.lock();
     let builder = Builder::new("tests/fixtures/faulty-crate")
         .unwrap()
         .disable_colors();
@@ -247,7 +256,7 @@ fn should_report_about_build_failure() {
 
     let crate_absoulte_path_str = crate_absoulte_path.display().to_string();
 
-    match output.unwrap_err().kind() {
+    match output.unwrap_err().downcast_ref().unwrap() {
         BuildErrorKind::BuildFailed(diagnostics) => {
             assert_eq!(
                 diagnostics
@@ -258,26 +267,24 @@ fn should_report_about_build_failure() {
                         && !item.contains("Finished release [optimized] target(s)"))
                     .collect::<Vec<_>>(),
                 &[
-                    format!(
+                    &format!(
                         "   Compiling faulty-ptx_crate v0.1.0 ({})",
                         crate_absoulte_path_str
                     ),
-                    String::from("error[E0425]: cannot find function `external_fn` in this scope"),
-                    format!(" --> {}:6:20", lib_path.display()),
-                    String::from("  |"),
-                    String::from("6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;"),
-                    String::from("  |                    ^^^^^^^^^^^ not found in this scope"),
-                    String::from(""),
-                    String::from("error: aborting due to previous error"),
-                    String::from(""),
-                    String::from(
-                        "For more information about this error, try `rustc --explain E0425`.",
-                    ),
-                    String::from("error: could not compile `faulty-ptx_crate`."),
-                    String::from(""),
+                    "error[E0425]: cannot find function `external_fn` in this scope",
+                    &format!(" --> {}:6:20", lib_path.display()),
+                    "  |",
+                    "6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;",
+                    "  |                    ^^^^^^^^^^^ not found in this scope",
+                    "",
+                    "error: aborting due to previous error",
+                    "",
+                    "For more information about this error, try `rustc --explain E0425`.",
+                    "error: could not compile `faulty-ptx_crate`",
+                    "",
                 ]
             );
-        }
+        },
 
         _ => unreachable!("it should fail with proper error"),
     }
@@ -312,7 +319,7 @@ fn should_provide_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -347,7 +354,7 @@ fn should_provide_application_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -356,13 +363,14 @@ fn should_provide_application_crate_source_files() {
 #[test]
 fn should_not_get_built_from_rls() {
     let _lock = ENV_MUTEX.lock();
+
     env::set_var("CARGO", "some/path/to/rls");
 
     assert_eq!(Builder::is_build_needed(), false);
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {}
+        BuildStatus::NotNeeded => {},
         BuildStatus::Success(_) => unreachable!(),
     }
 
@@ -372,13 +380,14 @@ fn should_not_get_built_from_rls() {
 #[test]
 fn should_not_get_built_recursively() {
     let _lock = ENV_MUTEX.lock();
+
     env::set_var("PTX_CRATE_BUILDING", "1");
 
     assert_eq!(Builder::is_build_needed(), false);
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {}
+        BuildStatus::NotNeeded => {},
         BuildStatus::Success(_) => unreachable!(),
     }
 

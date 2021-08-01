@@ -1,16 +1,19 @@
-use std::env;
-use std::fmt;
-use std::fs::{read_to_string, write, File};
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
+use std::{
+    env, fmt,
+    fs::{read_to_string, write, File},
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 
-use failure::ResultExt;
-use lazy_static::*;
+use anyhow::Context;
+use lazy_static::lazy_static;
 use regex::Regex;
 
-use crate::error::*;
-use crate::executable::{Cargo, ExecutableRunner, Linker};
-use crate::source::Crate;
+use crate::{
+    error::{BuildErrorKind, Error, Result},
+    executable::{Cargo, ExecutableRunner, Linker},
+    source::Crate,
+};
 
 const LAST_BUILD_CMD: &str = ".last-build-command";
 const TARGET_NAME: &str = "nvptx64-nvidia-cuda";
@@ -41,7 +44,8 @@ pub enum BuildStatus<'a> {
 
     /// The CUDA crate building is not needed. Can happend in several cases:
     /// - `build.rs` script was called by **RLS**,
-    /// - `build.rs` was called **recursively** (e.g. `build.rs` call for device crate in single-source setup)
+    /// - `build.rs` was called **recursively** (e.g. `build.rs` call for device
+    ///   crate in single-source setup)
     NotNeeded,
 }
 
@@ -119,8 +123,9 @@ impl Builder {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(Builder {
             source_crate: Crate::analyse(path).context("Unable to analyse source crate")?,
-
-            profile: Profile::Release, // TODO: choose automatically, e.g.: `env::var("PROFILE").unwrap_or("release".to_string())`
+            // TODO: choose automatically, e.g.:
+            // `env::var("PROFILE").unwrap_or("release".to_string())`
+            profile: Profile::Release,
             colors: true,
             crate_type: None,
         })
@@ -130,23 +135,26 @@ impl Builder {
     ///
     /// Behavior is consistent with
     /// [`BuildStatus::NotNeeded`](enum.BuildStatus.html#variant.NotNeeded).
+    #[must_use]
     pub fn is_build_needed() -> bool {
         let cargo_env = env::var("CARGO");
         let recursive_env = env::var("PTX_CRATE_BUILDING");
 
-        let is_rls_build = cargo_env.is_ok() && cargo_env.unwrap().ends_with("rls");
-        let is_recursive_build = recursive_env.is_ok() && recursive_env.unwrap() == "1";
+        let is_rls_build = cargo_env.map_or(false, |cargo_env| cargo_env.ends_with("rls"));
+        let is_recursive_build = recursive_env.map_or(false, |recursive_env| recursive_env == "1");
 
         !is_rls_build && !is_recursive_build
     }
 
     /// Disable colors for internal calls to `cargo`.
+    #[must_use]
     pub fn disable_colors(mut self) -> Self {
         self.colors = false;
         self
     }
 
     /// Set build profile.
+    #[must_use]
     pub fn set_profile(mut self, profile: Profile) -> Self {
         self.profile = profile;
         self
@@ -160,12 +168,14 @@ impl Builder {
     /// error: extra arguments to `rustc` can only be passed to one target, consider filtering
     /// the package by passing e.g. `--lib` or `--bin NAME` to specify a single target
     /// ```
+    #[must_use]
     pub fn set_crate_type(mut self, crate_type: CrateType) -> Self {
         self.crate_type = Some(crate_type);
         self
     }
 
-    /// Performs an actual build: runs `cargo` with proper flags and environment.
+    /// Performs an actual build: runs `cargo` with proper flags and
+    /// environment.
     pub fn build(&self) -> Result<BuildStatus> {
         if !Self::is_build_needed() {
             return Ok(BuildStatus::NotNeeded);
@@ -175,9 +185,7 @@ impl Builder {
         ExecutableRunner::new(Linker).with_args(vec!["-V"]).run()?;
 
         let mut cargo = ExecutableRunner::new(Cargo);
-        let mut args = Vec::new();
-
-        args.push("rustc");
+        let mut args = vec!["rustc"];
 
         if self.profile == Profile::Release {
             args.push("--release");
@@ -193,20 +201,19 @@ impl Builder {
             Some(CrateType::Binary) => {
                 args.push("--bin");
                 args.push(self.source_crate.get_name());
-            }
+            },
 
             Some(CrateType::Library) => {
                 args.push("--lib");
-            }
+            },
 
-            _ => {}
+            _ => {},
         }
 
         args.push("-v");
         args.push("--");
         args.push("--crate-type");
         args.push("cdylib");
-        args.push("-Zcrate-attr=no_main");
 
         let output_path = {
             self.source_crate
@@ -220,8 +227,12 @@ impl Builder {
             .with_env("PTX_CRATE_BUILDING", "1")
             .with_env("CARGO_TARGET_DIR", output_path.clone());
 
-        let cargo_output = cargo.run().map_err(|error| match error.kind() {
-            BuildErrorKind::CommandFailed { stderr, .. } => {
+        let cargo_output = cargo.run().map_err(|error| match error.downcast_ref() {
+            None => Error::from(BuildErrorKind::InternalError(String::from(
+                "Error downcast failed.",
+            ))),
+            Some(BuildErrorKind::CommandFailed { stderr, .. }) => {
+                #[allow(clippy::manual_filter_map)]
                 let lines = stderr
                     .trim_matches('\n')
                     .split('\n')
@@ -230,9 +241,8 @@ impl Builder {
                     .collect();
 
                 Error::from(BuildErrorKind::BuildFailed(lines))
-            }
-
-            _ => error,
+            },
+            Some(_) => error,
         })?;
 
         Ok(BuildStatus::Success(
@@ -250,6 +260,7 @@ impl Builder {
 
         // We need the build command to get real output filename.
         let build_command = {
+            #[allow(clippy::manual_find_map)]
             cargo_stderr
                 .trim_matches('\n')
                 .split('\n')
@@ -267,7 +278,7 @@ impl Builder {
         };
 
         if let BuildCommand::Realtime(ref command) = build_command {
-            Self::store_cached_build_command(&output_path, &command)?;
+            Self::store_cached_build_command(&output_path, command)?;
         }
 
         let file_suffix = match SUFFIX_REGEX.captures(&build_command) {
@@ -277,7 +288,7 @@ impl Builder {
                 bail!(BuildErrorKind::InternalError(String::from(
                     "Unable to find `extra-filename` rustc flag",
                 )));
-            }
+            },
         };
 
         Ok(BuildOutput::new(self, output_path, file_suffix))
@@ -334,6 +345,7 @@ impl<'a> BuildOutput<'a> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn get_assembly_path(&self) -> PathBuf {
         self.output_path
             .join(TARGET_NAME)
@@ -383,9 +395,21 @@ impl<'a> BuildOutput<'a> {
             .skip(1)
             .collect::<String>();
 
+        let mut cargo_lock_dir = self.builder.source_crate.get_path();
+
+        // Traverse the workspace directory structure towards the root
+        while !cargo_lock_dir.join("Cargo.lock").is_file() {
+            cargo_lock_dir = match cargo_lock_dir.parent() {
+                Some(parent) => parent,
+                None => bail!(BuildErrorKind::InternalError(String::from(
+                    "Unable to find Cargo.lock file",
+                ))),
+            }
+        }
+
         let cargo_deps = vec![
             self.builder.source_crate.get_path().join("Cargo.toml"),
-            self.builder.source_crate.get_path().join("Cargo.lock"),
+            cargo_lock_dir.join("Cargo.lock"),
         ];
 
         Ok(deps_contents
@@ -440,8 +464,7 @@ impl std::ops::Deref for BuildCommand {
 
     fn deref(&self) -> &str {
         match self {
-            BuildCommand::Realtime(line) => &line,
-            BuildCommand::Cached(line) => &line,
+            BuildCommand::Realtime(line) | BuildCommand::Cached(line) => line,
         }
     }
 }

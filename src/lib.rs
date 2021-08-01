@@ -1,12 +1,17 @@
+#![deny(clippy::pedantic)]
+#![allow(clippy::missing_errors_doc)]
 #![deny(warnings)]
-#![warn(clippy::all)]
+#![allow(clippy::useless_attribute)]
+#![feature(backtrace)]
 
 //! `build.rs` helper crate for your CUDA experiments.
 //!
-//! It helps to automatically build device crate in both *single-source* and *separated-source* projects.
+//! It helps to automatically build device crate in both *single-source* and
+//! *separated-source* projects.
 //!
 //! Features the crate provide:
-//! * Automatically notify Cargo about device crate sources, so it can reuild on changes,
+//! * Automatically notify Cargo about device crate sources, so it can reuild on
+//!   changes,
 //! * Provide output PTX assembly path to Rust via environment variable,
 //! * Rich reporting of device crate errors,
 //! * Hints and troubleshooting for missing tools.
@@ -29,7 +34,8 @@
 //! }
 //! ```
 //!
-//! Now, on the host-side, the PTX assembly can be loaded and used with your favorite CUDA driver crate:
+//! Now, on the host-side, the PTX assembly can be loaded and used with your
+//! favorite CUDA driver crate:
 //! ```ignore
 //! use std::ffi::CString;
 //!
@@ -55,6 +61,8 @@ mod source;
 
 /// Convenient re-exports of mostly used types.
 pub mod prelude {
-    pub use crate::builder::{BuildStatus, Builder, CrateType, Profile};
-    pub use crate::reporter::{CargoAdapter, ErrorLogPrinter};
+    pub use crate::{
+        builder::{BuildStatus, Builder, CrateType, Profile},
+        reporter::{CargoAdapter, ErrorLogPrinter},
+    };
 }

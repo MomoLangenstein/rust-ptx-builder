@@ -1,16 +1,17 @@
-use std::fmt;
-use std::process::exit;
+use std::{fmt, process::exit};
 
-use colored::*;
-use failure::Fail;
+use colored::{control, Colorize};
 
-use crate::builder::{BuildStatus, Builder};
-use crate::error::*;
+use crate::{
+    builder::{BuildStatus, Builder},
+    error::{Error, Result},
+};
 
 /// Cargo integration adapter.
 ///
-/// Provides PTX assembly path to Rust through specified environment variable name
-/// and informs Cargo about device crate dependencies, so it can rebuild on changes.
+/// Provides PTX assembly path to Rust through specified environment variable
+/// name and informs Cargo about device crate dependencies, so it can rebuild on
+/// changes.
 ///
 /// # Usage in `build.rs`
 /// ```no_run
@@ -69,11 +70,11 @@ impl CargoAdapter {
                 for path in dependencies {
                     println!("cargo:rerun-if-changed={}", path.display());
                 }
-            }
+            },
 
             BuildStatus::NotNeeded => {
                 println!("cargo:rustc-env={}=/dev/null", self.env_name);
-            }
+            },
         };
 
         Ok(())
@@ -98,15 +99,16 @@ impl CargoAdapter {
 /// #    Err(BuildErrorKind::InternalError("any...".into()).into())
 /// # }
 pub struct ErrorLogPrinter {
-    error: Box<dyn Fail>,
+    error: Error,
     colors: bool,
 }
 
 impl ErrorLogPrinter {
     /// Creates instance of the printer.
+    #[must_use]
     pub fn print(error: Error) -> Self {
         Self {
-            error: Box::new(error),
+            error,
             colors: true,
         }
     }
@@ -145,7 +147,7 @@ impl fmt::Display for ErrorLogPrinter {
                 .prefix_each_line("[PTX] ".bright_black())
         )?;
 
-        for next in self.error.iter_causes() {
+        for next in self.error.chain().skip(1) {
             write!(
                 f,
                 "\n{}",

@@ -1,7 +1,6 @@
-use failure::ResultExt;
+use anyhow::Context;
 
-use ptx_builder::error::*;
-use ptx_builder::reporter::ErrorLogPrinter;
+use ptx_builder::{error::*, reporter::ErrorLogPrinter};
 
 #[test]
 fn should_report_in_cargo_style() {
@@ -12,9 +11,9 @@ fn should_report_in_cargo_style() {
     }));
 
     let chained_error = original_error
-        .with_context(|_| BuildErrorKind::InternalError(String::from("internal error")));
+        .with_context(|| BuildErrorKind::InternalError(String::from("internal error")));
 
-    let chained_error = chained_error.with_context(|_| {
+    let chained_error = chained_error.with_context(|| {
         BuildErrorKind::BuildFailed(vec![
             String::from("error[E0425]: cannot find function `external_fn` in this scope"),
             String::from(" --> src/lib.rs:6:20"),

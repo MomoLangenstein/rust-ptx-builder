@@ -1,7 +1,9 @@
 use semver::VersionReq;
 
-use ptx_builder::error::*;
-use ptx_builder::executable::{Cargo, Executable, ExecutableRunner};
+use ptx_builder::{
+    error::*,
+    executable::{Cargo, Executable, ExecutableRunner},
+};
 
 mod cargo {
     use super::*;
@@ -24,17 +26,17 @@ mod cargo {
             .with_cwd("tests/fixtures/sample-crate")
             .run();
 
-        match output.unwrap_err().kind() {
+        match output.unwrap_err().downcast_ref().unwrap() {
             BuildErrorKind::CommandFailed {
                 command,
                 code,
                 stderr,
             } => {
-                assert_eq!(command, String::from("cargo"));
-                assert_eq!(code, 1);
+                assert_eq!(command, "cargo");
+                assert_eq!(*code, 1);
 
                 assert!(stderr.contains("argument '--unknown-flag'"));
-            }
+            },
 
             _ => unreachable!("it should fail with proper error"),
         }
@@ -68,11 +70,11 @@ mod non_existing_command {
     fn should_not_provide_output() {
         let output = ExecutableRunner::new(NonExistingCommand).run();
 
-        match output.unwrap_err().kind() {
+        match output.unwrap_err().downcast_ref().unwrap() {
             BuildErrorKind::CommandNotFound { command, hint } => {
-                assert_eq!(command, String::from("almost-unique-name"));
-                assert_eq!(hint, String::from("Some useful hint"));
-            }
+                assert_eq!(command, "almost-unique-name");
+                assert_eq!(hint, "Some useful hint");
+            },
 
             _ => unreachable!("it should fail with proper error"),
         }
@@ -106,17 +108,17 @@ mod unrealistic_version_requirement {
     fn should_not_provide_output() {
         let output = ExecutableRunner::new(UnrealisticCommand).run();
 
-        match output.unwrap_err().kind() {
+        match output.unwrap_err().downcast_ref().unwrap() {
             BuildErrorKind::CommandVersionNotFulfilled {
                 command,
                 required,
                 hint,
                 ..
             } => {
-                assert_eq!(command, String::from("cargo"));
-                assert_eq!(required, VersionReq::parse("> 100.0.0").unwrap());
-                assert_eq!(hint, String::from("Some useful hint about version"));
-            }
+                assert_eq!(command, "cargo");
+                assert_eq!(required, &VersionReq::parse("> 100.0.0").unwrap());
+                assert_eq!(hint, "Some useful hint about version");
+            },
 
             _ => unreachable!("it should fail with proper error"),
         }
