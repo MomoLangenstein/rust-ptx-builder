@@ -15,7 +15,7 @@ mod cargo {
             .with_cwd("tests/fixtures/sample-crate")
             .run();
 
-        assert_eq!(output.is_ok(), true);
+        assert!(output.is_ok());
         assert_eq!(output.unwrap().stdout, String::from("sample_ptx_crate\n"));
     }
 
@@ -36,7 +36,7 @@ mod cargo {
                 assert_eq!(*code, 1);
 
                 assert!(stderr.contains("argument '--unknown-flag'"));
-            },
+            }
 
             _ => unreachable!("it should fail with proper error"),
         }
@@ -74,7 +74,7 @@ mod non_existing_command {
             BuildErrorKind::CommandNotFound { command, hint } => {
                 assert_eq!(command, "almost-unique-name");
                 assert_eq!(hint, "Some useful hint");
-            },
+            }
 
             _ => unreachable!("it should fail with proper error"),
         }
@@ -118,7 +118,7 @@ mod unrealistic_version_requirement {
                 assert_eq!(command, "cargo");
                 assert_eq!(required, &VersionReq::parse("> 100.0.0").unwrap());
                 assert_eq!(hint, "Some useful hint about version");
-            },
+            }
 
             _ => unreachable!("it should fail with proper error"),
         }

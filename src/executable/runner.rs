@@ -1,4 +1,9 @@
-use std::{ffi::OsStr, path::Path, process::Command};
+use std::{
+    ffi::OsStr,
+    io::{BufRead, BufReader},
+    path::Path,
+    process::{Command, Stdio},
+};
 
 use anyhow::Context;
 use regex::Regex;
@@ -56,18 +61,41 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
     pub fn run(&mut self) -> Result<Output> {
         self.check_version()?;
 
-        let raw_output = {
-            self.command.output().with_context(|| {
-                BuildErrorKind::InternalError(format!(
-                    "Unable to execute command '{}'",
-                    self.executable.get_name()
-                ))
-            })?
-        };
+        self.command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let mut process = self.command.spawn().with_context(|| {
+            BuildErrorKind::InternalError(format!(
+                "Unable to execute command '{}'",
+                self.executable.get_name()
+            ))
+        })?;
+
+        let mut stderr = String::new();
+
+        for line in
+            BufReader::new(process.stderr.take().context(BuildErrorKind::OtherError)?).lines()
+        {
+            let line = line.context(BuildErrorKind::OtherError)?;
+
+            stderr.push_str(&line);
+            stderr.push('\n');
+
+            eprintln!("{}", line);
+        }
+
+        let raw_output = process.wait_with_output().with_context(|| {
+            BuildErrorKind::InternalError(format!(
+                "Unable to execute command '{}'",
+                self.executable.get_name()
+            ))
+        })?;
 
         let output = Output {
             stdout: String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
-            stderr: String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
+            stderr,
         };
 
         if raw_output.status.success() {
@@ -93,7 +121,7 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
                     required: required.clone(),
                     hint: self.executable.get_version_hint(),
                 }))
-            },
+            }
 
             _ => Ok(()),
         }

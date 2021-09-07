@@ -201,13 +201,13 @@ impl Builder {
             Some(CrateType::Binary) => {
                 args.push("--bin");
                 args.push(self.source_crate.get_name());
-            },
+            }
 
             Some(CrateType::Library) => {
                 args.push("--lib");
-            },
+            }
 
-            _ => {},
+            _ => {}
         }
 
         args.push("-v");
@@ -241,7 +241,7 @@ impl Builder {
                     .collect();
 
                 Error::from(BuildErrorKind::BuildFailed(lines))
-            },
+            }
             Some(_) => error,
         })?;
 
@@ -288,7 +288,7 @@ impl Builder {
                 bail!(BuildErrorKind::InternalError(String::from(
                     "Unable to find `extra-filename` rustc flag",
                 )));
-            },
+            }
         };
 
         Ok(BuildOutput::new(self, output_path, file_suffix))

@@ -23,7 +23,7 @@ fn should_report_in_cargo_style() {
         ])
     });
 
-    let mut reporter = ErrorLogPrinter::print(chained_error.unwrap_err().into());
+    let mut reporter = ErrorLogPrinter::print(chained_error.unwrap_err());
 
     assert_eq!(
         reporter.disable_colors().to_string(),

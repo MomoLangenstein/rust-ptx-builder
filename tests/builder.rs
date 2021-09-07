@@ -30,7 +30,7 @@ fn should_provide_output_path() {
                     .join("ptx-builder-0.5")
                     .join("sample_ptx_crate"),
             ));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -59,7 +59,7 @@ fn should_write_assembly() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -88,7 +88,7 @@ fn should_build_application_crate() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -124,7 +124,7 @@ fn should_build_mixed_crate_lib() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -160,7 +160,7 @@ fn should_build_mixed_crate_bin() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -195,7 +195,7 @@ fn should_handle_rebuild_without_changes() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -229,7 +229,7 @@ fn should_write_assembly_in_debug_mode() {
                 .contains("debug"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -260,7 +260,7 @@ fn should_report_about_build_failure() {
         BuildErrorKind::BuildFailed(diagnostics) => {
             assert_eq!(
                 diagnostics
-                    .into_iter()
+                    .iter()
                     .filter(|item| !item.contains("Blocking waiting")
                         && !item.contains("Compiling core")
                         && !item.contains("Compiling compiler_builtins")
@@ -277,14 +277,12 @@ fn should_report_about_build_failure() {
                     "6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;",
                     "  |                    ^^^^^^^^^^^ not found in this scope",
                     "",
-                    "error: aborting due to previous error",
-                    "",
                     "For more information about this error, try `rustc --explain E0425`.",
-                    "error: could not compile `faulty-ptx_crate`",
+                    "error: could not compile `faulty-ptx_crate` due to previous error",
                     "",
                 ]
             );
-        },
+        }
 
         _ => unreachable!("it should fail with proper error"),
     }
@@ -319,7 +317,7 @@ fn should_provide_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -354,7 +352,7 @@ fn should_provide_application_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        },
+        }
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -366,11 +364,11 @@ fn should_not_get_built_from_rls() {
 
     env::set_var("CARGO", "some/path/to/rls");
 
-    assert_eq!(Builder::is_build_needed(), false);
+    assert!(!Builder::is_build_needed());
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {},
+        BuildStatus::NotNeeded => {}
         BuildStatus::Success(_) => unreachable!(),
     }
 
@@ -383,11 +381,11 @@ fn should_not_get_built_recursively() {
 
     env::set_var("PTX_CRATE_BUILDING", "1");
 
-    assert_eq!(Builder::is_build_needed(), false);
+    assert!(!Builder::is_build_needed());
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {},
+        BuildStatus::NotNeeded => {}
         BuildStatus::Success(_) => unreachable!(),
     }
 
