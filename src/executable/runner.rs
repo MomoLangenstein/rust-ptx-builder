@@ -83,7 +83,14 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
             stderr.push_str(&line);
             stderr.push('\n');
 
-            eprintln!("{}", line);
+            if !line.starts_with("+ ")
+                && !line.contains("Running")
+                && !line.contains("Fresh")
+                && !line.starts_with("Caused by:")
+                && !line.starts_with("  process didn\'t exit successfully: ")
+            {
+                eprintln!("{}", line);
+            }
         }
 
         let raw_output = process.wait_with_output().with_context(|| {
