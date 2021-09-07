@@ -26,6 +26,7 @@ pub struct Builder {
     profile: Profile,
     colors: bool,
     crate_type: Option<CrateType>,
+    error_format: ErrorFormat,
 }
 
 /// Successful build output.
@@ -70,6 +71,32 @@ pub enum Profile {
 
     /// Equivalent for `cargo-build` **with** `--release` flag.
     Release,
+}
+
+/// Error format.
+///
+/// # Usage
+/// ``` no_run
+/// use ptx_builder::prelude::*;
+/// # use ptx_builder::error::Result;
+///
+/// # fn main() -> Result<()> {
+/// Builder::new(".")?
+///     .set_error_format(ErrorFormat::JSON)
+///     .build()?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(PartialEq, Clone, Debug)]
+pub enum ErrorFormat {
+    /// Equivalent for `cargo-build` with `--error-format=human` flag (default).
+    Human,
+
+    /// Equivalent for `cargo-build` with `--error-format=json` flag
+    JSON,
+
+    /// Equivalent for `cargo-build` with `--error-format=short` flag
+    Short,
 }
 
 /// Build specified crate type.
@@ -128,6 +155,7 @@ impl Builder {
             profile: Profile::Release,
             colors: true,
             crate_type: None,
+            error_format: ErrorFormat::Human,
         })
     }
 
@@ -174,6 +202,13 @@ impl Builder {
         self
     }
 
+    /// Set the error format.
+    #[must_use]
+    pub fn set_error_format(mut self, error_format: ErrorFormat) -> Self {
+        self.error_format = error_format;
+        self
+    }
+
     /// Performs an actual build: runs `cargo` with proper flags and
     /// environment.
     pub fn build(&self) -> Result<BuildStatus> {
@@ -194,10 +229,14 @@ impl Builder {
         args.push("--color");
         args.push(if self.colors { "always" } else { "never" });
 
+        args.push(match self.error_format {
+            ErrorFormat::Human => "--message-format=human",
+            ErrorFormat::JSON => "--message-format=json",
+            ErrorFormat::Short => "--message-format=short",
+        });
+
         args.push("--target");
         args.push(TARGET_NAME);
-
-        args.push("--message-format=json");
 
         match self.crate_type {
             Some(CrateType::Binary) => {
@@ -229,7 +268,12 @@ impl Builder {
             .with_env("PTX_CRATE_BUILDING", "1")
             .with_env("CARGO_TARGET_DIR", output_path.clone());
 
-        let cargo_output = cargo.run().map_err(|error| match error.downcast_ref() {
+        let cargo_output = if self.error_format == ErrorFormat::JSON {
+            cargo.run_live(true, |_| true)
+        } else {
+            cargo.run_live(false, Self::output_is_not_verbose)
+        }
+        .map_err(|error| match error.downcast_ref() {
             None => Error::from(BuildErrorKind::InternalError(String::from(
                 "Error downcast failed.",
             ))),

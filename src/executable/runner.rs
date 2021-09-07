@@ -61,6 +61,34 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
     pub fn run(&mut self) -> Result<Output> {
         self.check_version()?;
 
+        let raw_output = {
+            self.command.output().with_context(|| {
+                BuildErrorKind::InternalError(format!(
+                    "Unable to execute command '{}'",
+                    self.executable.get_name()
+                ))
+            })?
+        };
+
+        let output = Output {
+            stdout: String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
+            stderr: String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
+        };
+
+        if raw_output.status.success() {
+            Ok(output)
+        } else {
+            Err(Error::from(BuildErrorKind::CommandFailed {
+                command: self.executable.get_name(),
+                code: raw_output.status.code().unwrap_or(-1),
+                stderr: output.stderr,
+            }))
+        }
+    }
+
+    pub fn run_live<F: Fn(&&str) -> bool>(&mut self, stdout: bool, filter: F) -> Result<Output> {
+        self.check_version()?;
+
         self.command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -73,25 +101,34 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
             ))
         })?;
 
-        let mut stdout = String::new();
+        let mut live_buf = String::new();
 
-        for line in
-            BufReader::new(process.stdout.take().context(BuildErrorKind::OtherError)?).lines()
-        {
+        let live_pipe = if stdout {
+            process
+                .stdout
+                .take()
+                .map(|stdout| Box::new(stdout) as Box<dyn std::io::Read>)
+        } else {
+            process
+                .stderr
+                .take()
+                .map(|stderr| Box::new(stderr) as Box<dyn std::io::Read>)
+        }
+        .context(BuildErrorKind::OtherError)?;
+
+        for line in BufReader::new(live_pipe).lines() {
             let line = line.context(BuildErrorKind::OtherError)?;
 
-            stdout.push_str(&line);
-            stdout.push('\n');
+            live_buf.push_str(&line);
+            live_buf.push('\n');
 
-            /*if !line.starts_with("+ ")
-                && !line.contains("Running")
-                && !line.contains("Fresh")
-                && !line.starts_with("Caused by:")
-                && !line.starts_with("  process didn\'t exit successfully: ")
-            {
-                eprintln!("{}", line);
-            }*/
-            println!("{}", line);
+            if filter(&&*line) {
+                if stdout {
+                    println!("{}", line);
+                } else {
+                    eprintln!("{}", line);
+                }
+            }
         }
 
         let raw_output = process.wait_with_output().with_context(|| {
@@ -101,10 +138,19 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
             ))
         })?;
 
-        let output = Output {
-            stdout,
-            stderr: String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
+        let (stdout, stderr) = if stdout {
+            (
+                live_buf,
+                String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
+            )
+        } else {
+            (
+                String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
+                live_buf,
+            )
         };
+
+        let output = Output { stdout, stderr };
 
         if raw_output.status.success() {
             Ok(output)

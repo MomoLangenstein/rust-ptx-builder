@@ -62,7 +62,7 @@ mod source;
 /// Convenient re-exports of mostly used types.
 pub mod prelude {
     pub use crate::{
-        builder::{BuildStatus, Builder, CrateType, Profile},
+        builder::{BuildStatus, Builder, CrateType, ErrorFormat, Profile},
         reporter::{CargoAdapter, ErrorLogPrinter},
     };
 }
