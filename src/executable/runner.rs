@@ -73,24 +73,25 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
             ))
         })?;
 
-        let mut stderr = String::new();
+        let mut stdout = String::new();
 
         for line in
-            BufReader::new(process.stderr.take().context(BuildErrorKind::OtherError)?).lines()
+            BufReader::new(process.stdout.take().context(BuildErrorKind::OtherError)?).lines()
         {
             let line = line.context(BuildErrorKind::OtherError)?;
 
-            stderr.push_str(&line);
-            stderr.push('\n');
+            stdout.push_str(&line);
+            stdout.push('\n');
 
-            if !line.starts_with("+ ")
+            /*if !line.starts_with("+ ")
                 && !line.contains("Running")
                 && !line.contains("Fresh")
                 && !line.starts_with("Caused by:")
                 && !line.starts_with("  process didn\'t exit successfully: ")
             {
                 eprintln!("{}", line);
-            }
+            }*/
+            println!("{}", line);
         }
 
         let raw_output = process.wait_with_output().with_context(|| {
@@ -101,8 +102,8 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
         })?;
 
         let output = Output {
-            stdout: String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
-            stderr,
+            stdout,
+            stderr: String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
         };
 
         if raw_output.status.success() {
