@@ -197,6 +197,8 @@ impl Builder {
         args.push("--target");
         args.push(TARGET_NAME);
 
+        args.push("--message-format=json");
+
         match self.crate_type {
             Some(CrateType::Binary) => {
                 args.push("--bin");
