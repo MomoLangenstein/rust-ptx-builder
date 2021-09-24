@@ -2,6 +2,7 @@ use semver::{Version, VersionReq};
 
 use crate::error::Result;
 
+mod process;
 pub mod runner;
 #[allow(clippy::module_name_repetitions)]
 pub use self::runner::{ExecutableRunner, Output};

@@ -268,28 +268,25 @@ impl Builder {
             .with_env("PTX_CRATE_BUILDING", "1")
             .with_env("CARGO_TARGET_DIR", output_path.clone());
 
-        let cargo_output = if self.error_format == ErrorFormat::JSON {
-            cargo.run_live(true, |_| true)
-        } else {
-            cargo.run_live(false, Self::output_is_not_verbose)
-        }
-        .map_err(|error| match error.downcast_ref() {
-            None => Error::from(BuildErrorKind::InternalError(String::from(
-                "Error downcast failed.",
-            ))),
-            Some(BuildErrorKind::CommandFailed { stderr, .. }) => {
-                #[allow(clippy::manual_filter_map)]
-                let lines = stderr
-                    .trim_matches('\n')
-                    .split('\n')
-                    .filter(Self::output_is_not_verbose)
-                    .map(String::from)
-                    .collect();
+        let cargo_output = cargo
+            .run_live(|_| true, Self::output_is_not_verbose)
+            .map_err(|error| match error.downcast_ref() {
+                None => Error::from(BuildErrorKind::InternalError(String::from(
+                    "Error downcast failed.",
+                ))),
+                Some(BuildErrorKind::CommandFailed { stderr, .. }) => {
+                    #[allow(clippy::manual_filter_map)]
+                    let lines = stderr
+                        .trim_matches('\n')
+                        .split('\n')
+                        .filter(|s| Self::output_is_not_verbose(*s))
+                        .map(String::from)
+                        .collect();
 
-                Error::from(BuildErrorKind::BuildFailed(lines))
-            }
-            Some(_) => error,
-        })?;
+                    Error::from(BuildErrorKind::BuildFailed(lines))
+                }
+                Some(_) => error,
+            })?;
 
         Ok(BuildStatus::Success(
             self.prepare_output(output_path, &cargo_output.stderr)?,
@@ -340,7 +337,7 @@ impl Builder {
         Ok(BuildOutput::new(self, output_path, file_suffix))
     }
 
-    fn output_is_not_verbose(line: &&str) -> bool {
+    fn output_is_not_verbose(line: &str) -> bool {
         !line.starts_with("+ ")
             && !line.contains("Running")
             && !line.contains("Fresh")

@@ -1,16 +1,13 @@
-use std::{
-    ffi::OsStr,
-    io::{BufRead, BufReader},
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::{ffi::OsStr, path::Path, process::Command};
 
 use anyhow::Context;
 use regex::Regex;
 use semver::Version;
 
-use super::Executable;
 use crate::error::{BuildErrorKind, Error, Result};
+
+use super::process::streaming_output;
+use super::Executable;
 
 #[allow(clippy::module_name_repetitions)]
 pub struct ExecutableRunner<Ex: Executable> {
@@ -86,71 +83,37 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
         }
     }
 
-    pub fn run_live<F: Fn(&&str) -> bool>(&mut self, stdout: bool, filter: F) -> Result<Output> {
+    pub fn run_live<O: Fn(&str) -> bool, E: Fn(&str) -> bool>(
+        &mut self,
+        stdout_filter: O,
+        stderr_filter: E,
+    ) -> Result<Output> {
         self.check_version()?;
 
-        self.command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        let mut process = self.command.spawn().with_context(|| {
-            BuildErrorKind::InternalError(format!(
-                "Unable to execute command '{}'",
-                self.executable.get_name()
-            ))
-        })?;
-
-        let mut live_buf = String::new();
-
-        let live_pipe = if stdout {
-            process
-                .stdout
-                .take()
-                .map(|stdout| Box::new(stdout) as Box<dyn std::io::Read>)
-        } else {
-            process
-                .stderr
-                .take()
-                .map(|stderr| Box::new(stderr) as Box<dyn std::io::Read>)
-        }
-        .context(BuildErrorKind::OtherError)?;
-
-        for line in BufReader::new(live_pipe).lines() {
-            let line = line.context(BuildErrorKind::OtherError)?;
-
-            live_buf.push_str(&line);
-            live_buf.push('\n');
-
-            if filter(&&*line) {
-                if stdout {
-                    println!("{}", line);
-                } else {
-                    eprintln!("{}", line);
+        let raw_output = streaming_output(
+            &mut self.command,
+            |stdout_line| {
+                if stdout_filter(stdout_line) {
+                    println!("{}", stdout_line);
                 }
-            }
-        }
-
-        let raw_output = process.wait_with_output().with_context(|| {
+            },
+            |stderr_line| {
+                if stderr_filter(stderr_line) {
+                    eprintln!("{}", stderr_line);
+                }
+            },
+        )
+        .with_context(|| {
             BuildErrorKind::InternalError(format!(
                 "Unable to execute command '{}'",
                 self.executable.get_name()
             ))
         })?;
 
-        let (stdout, stderr) = if stdout {
-            (
-                live_buf,
-                String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
-            )
-        } else {
-            (
-                String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
-                live_buf,
-            )
+        let output = Output {
+            stdout: String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
+            stderr: String::from_utf8(raw_output.stderr).context(BuildErrorKind::OtherError)?,
         };
-
-        let output = Output { stdout, stderr };
 
         if raw_output.status.success() {
             Ok(output)
