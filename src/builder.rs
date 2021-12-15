@@ -27,6 +27,7 @@ pub struct Builder {
     colors: bool,
     crate_type: Option<CrateType>,
     error_format: ErrorFormat,
+    prefix: String,
 }
 
 /// Successful build output.
@@ -156,6 +157,7 @@ impl Builder {
             colors: true,
             crate_type: None,
             error_format: ErrorFormat::Human,
+            prefix: String::new(),
         })
     }
 
@@ -206,6 +208,13 @@ impl Builder {
     #[must_use]
     pub fn set_error_format(mut self, error_format: ErrorFormat) -> Self {
         self.error_format = error_format;
+        self
+    }
+
+    /// Set the build command prefix.
+    #[must_use]
+    pub fn set_prefix(mut self, prefix: String) -> Self {
+        self.prefix = prefix;
         self
     }
 
@@ -312,7 +321,7 @@ impl Builder {
                         && line.contains("--crate-type cdylib")
                 })
                 .map(|line| BuildCommand::Realtime(line.to_string()))
-                .or_else(|| Self::load_cached_build_command(&output_path))
+                .or_else(|| Self::load_cached_build_command(&output_path, &self.prefix))
                 .ok_or_else(|| {
                     Error::from(BuildErrorKind::InternalError(String::from(
                         "Unable to find build command of the device crate",
@@ -321,7 +330,7 @@ impl Builder {
         };
 
         if let BuildCommand::Realtime(ref command) = build_command {
-            Self::store_cached_build_command(&output_path, command)?;
+            Self::store_cached_build_command(&output_path, &self.prefix, command)?;
         }
 
         let file_suffix = match SUFFIX_REGEX.captures(&build_command) {
@@ -345,16 +354,19 @@ impl Builder {
             && !line.starts_with("  process didn\'t exit successfully: ")
     }
 
-    fn load_cached_build_command(output_path: &Path) -> Option<BuildCommand> {
-        match read_to_string(output_path.join(LAST_BUILD_CMD)) {
+    fn load_cached_build_command(output_path: &Path, prefix: &str) -> Option<BuildCommand> {
+        match read_to_string(output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix))) {
             Ok(contents) => Some(BuildCommand::Cached(contents)),
             Err(_) => None,
         }
     }
 
-    fn store_cached_build_command(output_path: &Path, command: &str) -> Result<()> {
-        write(output_path.join(LAST_BUILD_CMD), command.as_bytes())
-            .context(BuildErrorKind::OtherError)?;
+    fn store_cached_build_command(output_path: &Path, prefix: &str, command: &str) -> Result<()> {
+        write(
+            output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix)),
+            command.as_bytes(),
+        )
+        .context(BuildErrorKind::OtherError)?;
 
         Ok(())
     }

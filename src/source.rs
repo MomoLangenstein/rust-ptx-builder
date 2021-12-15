@@ -76,7 +76,7 @@ impl Crate {
         let is_library = path.join("src").join("lib.rs").exists();
         let is_binary = path.join("src").join("main.rs").exists();
 
-        let output_file_prefix = cargo_toml_name.replace("-", "_");
+        let output_file_prefix = cargo_toml_name.replace('-', "_");
 
         let deps_file_prefix = match (is_binary, is_library) {
             (false, true) => FilePrefix::Library(format!("lib{}", output_file_prefix)),
