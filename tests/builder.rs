@@ -3,7 +3,7 @@ use std::{
     env::current_dir,
     fs::{remove_dir_all, File},
     io::prelude::*,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use antidote::Mutex;
@@ -25,11 +25,9 @@ fn should_provide_output_path() {
 
     match builder.disable_colors().build().unwrap() {
         BuildStatus::Success(output) => {
-            assert!(output.get_assembly_path().starts_with(
-                env::temp_dir()
-                    .join("ptx-builder-0.5")
-                    .join("sample_ptx_crate"),
-            ));
+            assert!(output
+                .get_assembly_path()
+                .starts_with(Path::new(env!("OUT_DIR")).join("sample_ptx_crate"),));
         }
 
         BuildStatus::NotNeeded => unreachable!(),
@@ -401,6 +399,6 @@ fn cleanup_temp_location() {
     ];
 
     for name in crate_names {
-        remove_dir_all(env::temp_dir().join("ptx-builder-0.5").join(name)).unwrap_or_default();
+        remove_dir_all(Path::new(env!("OUT_DIR")).join(name)).unwrap_or_default();
     }
 }
