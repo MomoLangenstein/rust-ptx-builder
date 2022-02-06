@@ -70,11 +70,11 @@ impl CargoAdapter {
                 for path in dependencies {
                     println!("cargo:rerun-if-changed={}", path.display());
                 }
-            }
+            },
 
             BuildStatus::NotNeeded => {
                 println!("cargo:rustc-env={}=/dev/null", self.env_name);
-            }
+            },
         };
 
         Ok(())

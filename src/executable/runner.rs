@@ -6,8 +6,7 @@ use semver::Version;
 
 use crate::error::{BuildErrorKind, Error, Result};
 
-use super::process::streaming_output;
-use super::Executable;
+use super::{process::streaming_output, Executable};
 
 #[allow(clippy::module_name_repetitions)]
 pub struct ExecutableRunner<Ex: Executable> {
@@ -83,32 +82,20 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
         }
     }
 
-    pub fn run_live<O: Fn(&str) -> bool, E: Fn(&str) -> bool>(
+    pub fn run_live<O: FnMut(&str), E: FnMut(&str)>(
         &mut self,
-        stdout_filter: O,
-        stderr_filter: E,
+        on_stdout_line: O,
+        on_stderr_line: E,
     ) -> Result<Output> {
         self.check_version()?;
 
-        let raw_output = streaming_output(
-            &mut self.command,
-            |stdout_line| {
-                if stdout_filter(stdout_line) {
-                    println!("{}", stdout_line);
-                }
-            },
-            |stderr_line| {
-                if stderr_filter(stderr_line) {
-                    eprintln!("{}", stderr_line);
-                }
-            },
-        )
-        .with_context(|| {
-            BuildErrorKind::InternalError(format!(
-                "Unable to execute command '{}'",
-                self.executable.get_name()
-            ))
-        })?;
+        let raw_output = streaming_output(&mut self.command, on_stdout_line, on_stderr_line)
+            .with_context(|| {
+                BuildErrorKind::InternalError(format!(
+                    "Unable to execute command '{}'",
+                    self.executable.get_name()
+                ))
+            })?;
 
         let output = Output {
             stdout: String::from_utf8(raw_output.stdout).context(BuildErrorKind::OtherError)?,
@@ -138,7 +125,7 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
                     required: required.clone(),
                     hint: self.executable.get_version_hint(),
                 }))
-            }
+            },
 
             _ => Ok(()),
         }

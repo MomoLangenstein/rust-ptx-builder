@@ -28,7 +28,7 @@ fn should_provide_output_path() {
             assert!(output
                 .get_assembly_path()
                 .starts_with(Path::new(env!("OUT_DIR")).join("sample_ptx_crate"),));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -57,7 +57,7 @@ fn should_write_assembly() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -86,7 +86,7 @@ fn should_build_application_crate() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -122,7 +122,7 @@ fn should_build_mixed_crate_lib() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -158,7 +158,7 @@ fn should_build_mixed_crate_bin() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -193,7 +193,7 @@ fn should_handle_rebuild_without_changes() {
                 .contains("release"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -227,7 +227,7 @@ fn should_write_assembly_in_debug_mode() {
                 .contains("debug"));
 
             assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -280,7 +280,7 @@ fn should_report_about_build_failure() {
                     "",
                 ]
             );
-        }
+        },
 
         _ => unreachable!("it should fail with proper error"),
     }
@@ -315,7 +315,7 @@ fn should_provide_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -350,7 +350,7 @@ fn should_provide_application_crate_source_files() {
             expectations.sort();
 
             assert_eq!(sources, expectations);
-        }
+        },
 
         BuildStatus::NotNeeded => unreachable!(),
     }
@@ -366,7 +366,7 @@ fn should_not_get_built_from_rls() {
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {}
+        BuildStatus::NotNeeded => {},
         BuildStatus::Success(_) => unreachable!(),
     }
 
@@ -383,7 +383,7 @@ fn should_not_get_built_recursively() {
     let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
-        BuildStatus::NotNeeded => {}
+        BuildStatus::NotNeeded => {},
         BuildStatus::Success(_) => unreachable!(),
     }
 

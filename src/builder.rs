@@ -26,7 +26,7 @@ pub struct Builder {
     profile: Profile,
     colors: bool,
     crate_type: Option<CrateType>,
-    error_format: ErrorFormat,
+    message_format: MessageFormat,
     prefix: String,
 }
 
@@ -74,7 +74,7 @@ pub enum Profile {
     Release,
 }
 
-/// Error format.
+/// Message format.
 ///
 /// # Usage
 /// ``` no_run
@@ -83,20 +83,31 @@ pub enum Profile {
 ///
 /// # fn main() -> Result<()> {
 /// Builder::new(".")?
-///     .set_error_format(ErrorFormat::JSON)
+///     .set_message_format(MessageFormat::Short)
 ///     .build()?;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(PartialEq, Clone, Debug)]
-pub enum ErrorFormat {
-    /// Equivalent for `cargo-build` with `--error-format=human` flag (default).
+pub enum MessageFormat {
+    /// Equivalent for `cargo-build` with `--message-format=human` flag
+    /// (default).
     Human,
 
-    /// Equivalent for `cargo-build` with `--error-format=json` flag
-    JSON,
+    /// Equivalent for `cargo-build` with `--message-format=json` flag
+    Json {
+        /// Whether rustc diagnostics are rendered by cargo or included into the
+        /// output stream.
+        render_diagnostics: bool,
+        /// Whether the `rendered` field of rustc diagnostics are using the
+        /// "short" rendering.
+        short: bool,
+        /// Whether the `rendered` field of rustc diagnostics embed ansi color
+        /// codes.
+        ansi: bool,
+    },
 
-    /// Equivalent for `cargo-build` with `--error-format=short` flag
+    /// Equivalent for `cargo-build` with `--message-format=short` flag
     Short,
 }
 
@@ -156,7 +167,7 @@ impl Builder {
             profile: Profile::Release,
             colors: true,
             crate_type: None,
-            error_format: ErrorFormat::Human,
+            message_format: MessageFormat::Human,
             prefix: String::new(),
         })
     }
@@ -204,10 +215,10 @@ impl Builder {
         self
     }
 
-    /// Set the error format.
+    /// Set the message format.
     #[must_use]
-    pub fn set_error_format(mut self, error_format: ErrorFormat) -> Self {
-        self.error_format = error_format;
+    pub fn set_message_format(mut self, message_format: MessageFormat) -> Self {
+        self.message_format = message_format;
         self
     }
 
@@ -221,6 +232,16 @@ impl Builder {
     /// Performs an actual build: runs `cargo` with proper flags and
     /// environment.
     pub fn build(&self) -> Result<BuildStatus> {
+        self.build_live(|_line| (), |_line| ())
+    }
+
+    /// Performs an actual build: runs `cargo` with proper flags and
+    /// environment.
+    pub fn build_live<O: FnMut(&str), E: FnMut(&str)>(
+        &self,
+        on_stdout_line: O,
+        mut on_stderr_line: E,
+    ) -> Result<BuildStatus> {
         if !Self::is_build_needed() {
             return Ok(BuildStatus::NotNeeded);
         }
@@ -238,10 +259,29 @@ impl Builder {
         args.push("--color");
         args.push(if self.colors { "always" } else { "never" });
 
-        args.push(match self.error_format {
-            ErrorFormat::Human => "--message-format=human",
-            ErrorFormat::JSON => "--message-format=json",
-            ErrorFormat::Short => "--message-format=short",
+        let mut json_format = String::from("--message-format=json");
+        args.push(match self.message_format {
+            MessageFormat::Human => "--message-format=human",
+            MessageFormat::Json {
+                render_diagnostics,
+                short,
+                ansi,
+            } => {
+                if render_diagnostics {
+                    json_format.push_str(",json-render-diagnostics");
+                }
+
+                if short {
+                    json_format.push_str(",json-diagnostic-short");
+                }
+
+                if ansi {
+                    json_format.push_str(",json-diagnostic-rendered-ansi");
+                }
+
+                &json_format
+            },
+            MessageFormat::Short => "--message-format=short",
         });
 
         args.push("--target");
@@ -251,13 +291,13 @@ impl Builder {
             Some(CrateType::Binary) => {
                 args.push("--bin");
                 args.push(self.source_crate.get_name());
-            }
+            },
 
             Some(CrateType::Library) => {
                 args.push("--lib");
-            }
+            },
 
-            _ => {}
+            _ => {},
         }
 
         args.push("-v");
@@ -278,7 +318,11 @@ impl Builder {
             .with_env("CARGO_TARGET_DIR", output_path.clone());
 
         let cargo_output = cargo
-            .run_live(|_| true, Self::output_is_not_verbose)
+            .run_live(on_stdout_line, |line| {
+                if Self::output_is_not_verbose(line) {
+                    on_stderr_line(line);
+                }
+            })
             .map_err(|error| match error.downcast_ref() {
                 None => Error::from(BuildErrorKind::InternalError(String::from(
                     "Error downcast failed.",
@@ -293,7 +337,7 @@ impl Builder {
                         .collect();
 
                     Error::from(BuildErrorKind::BuildFailed(lines))
-                }
+                },
                 Some(_) => error,
             })?;
 
@@ -340,7 +384,7 @@ impl Builder {
                 bail!(BuildErrorKind::InternalError(String::from(
                     "Unable to find `extra-filename` rustc flag",
                 )));
-            }
+            },
         };
 
         Ok(BuildOutput::new(self, output_path, file_suffix))

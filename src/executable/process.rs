@@ -119,7 +119,7 @@ mod imp {
                     } else {
                         Err(e)
                     }
-                }
+                },
             };
             if !err_done && fds[errfd].revents != 0 && handle(err_pipe.read_to_end(&mut err))? {
                 err_done = true;
@@ -221,7 +221,7 @@ mod imp {
                     } else {
                         Err(e)
                     }
-                }
+                },
             }
         }
 
