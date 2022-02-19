@@ -178,13 +178,11 @@ impl Builder {
     /// [`BuildStatus::NotNeeded`](enum.BuildStatus.html#variant.NotNeeded).
     #[must_use]
     pub fn is_build_needed() -> bool {
-        let cargo_env = env::var("CARGO");
         let recursive_env = env::var("PTX_CRATE_BUILDING");
 
-        let is_rls_build = cargo_env.map_or(false, |cargo_env| cargo_env.ends_with("rls"));
         let is_recursive_build = recursive_env.map_or(false, |recursive_env| recursive_env == "1");
 
-        !is_rls_build && !is_recursive_build
+        !is_recursive_build
     }
 
     /// Disable colors for internal calls to `cargo`.
@@ -280,7 +278,7 @@ impl Builder {
                 }
 
                 &json_format
-            },
+            }
             MessageFormat::Short => "--message-format=short",
         });
 
@@ -291,19 +289,22 @@ impl Builder {
             Some(CrateType::Binary) => {
                 args.push("--bin");
                 args.push(self.source_crate.get_name());
-            },
+            }
 
             Some(CrateType::Library) => {
                 args.push("--lib");
-            },
+            }
 
-            _ => {},
+            _ => {}
         }
 
         args.push("-v");
+
+        let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
+
         args.push("--");
         args.push("--crate-type");
-        args.push("cdylib");
+        args.push(crate_type);
 
         let output_path = {
             self.source_crate
@@ -337,16 +338,23 @@ impl Builder {
                         .collect();
 
                     Error::from(BuildErrorKind::BuildFailed(lines))
-                },
+                }
                 Some(_) => error,
             })?;
 
-        Ok(BuildStatus::Success(
-            self.prepare_output(output_path, &cargo_output.stderr)?,
-        ))
+        Ok(BuildStatus::Success(self.prepare_output(
+            output_path,
+            &cargo_output.stderr,
+            crate_type,
+        )?))
     }
 
-    fn prepare_output(&self, output_path: PathBuf, cargo_stderr: &str) -> Result<BuildOutput> {
+    fn prepare_output(
+        &self,
+        output_path: PathBuf,
+        cargo_stderr: &str,
+        crate_type: &str,
+    ) -> Result<BuildOutput> {
         lazy_static! {
             static ref SUFFIX_REGEX: Regex =
                 Regex::new(r"-C extra-filename=([\S]+)").expect("Unable to parse regex...");
@@ -362,7 +370,7 @@ impl Builder {
                 .split('\n')
                 .find(|line| {
                     line.contains(&format!("--crate-name {}", crate_name))
-                        && line.contains("--crate-type cdylib")
+                        && line.contains(&format!("--crate-type {}", crate_type))
                 })
                 .map(|line| BuildCommand::Realtime(line.to_string()))
                 .or_else(|| Self::load_cached_build_command(&output_path, &self.prefix))
@@ -384,7 +392,7 @@ impl Builder {
                 bail!(BuildErrorKind::InternalError(String::from(
                     "Unable to find `extra-filename` rustc flag",
                 )));
-            },
+            }
         };
 
         Ok(BuildOutput::new(self, output_path, file_suffix))

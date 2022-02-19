@@ -125,7 +125,7 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
                     required: required.clone(),
                     hint: self.executable.get_version_hint(),
                 }))
-            },
+            }
 
             _ => Ok(()),
         }
