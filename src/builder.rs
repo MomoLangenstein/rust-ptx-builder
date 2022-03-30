@@ -5,12 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Context;
 use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::{
-    error::{BuildErrorKind, Error, Result},
+    error::{BuildErrorKind, Error, Result, ResultExt},
     executable::{Cargo, ExecutableRunner, Linker},
     source::Crate,
 };
@@ -324,11 +323,8 @@ impl Builder {
                     on_stderr_line(line);
                 }
             })
-            .map_err(|error| match error.downcast_ref() {
-                None => Error::from(BuildErrorKind::InternalError(String::from(
-                    "Error downcast failed.",
-                ))),
-                Some(BuildErrorKind::CommandFailed { stderr, .. }) => {
+            .map_err(|error| match error.kind() {
+                BuildErrorKind::CommandFailed { stderr, .. } => {
                     #[allow(clippy::manual_filter_map)]
                     let lines = stderr
                         .trim_matches('\n')
@@ -339,7 +335,7 @@ impl Builder {
 
                     Error::from(BuildErrorKind::BuildFailed(lines))
                 }
-                Some(_) => error,
+                _ => error,
             })?;
 
         Ok(BuildStatus::Success(self.prepare_output(
@@ -553,10 +549,10 @@ impl<'a> BuildOutput<'a> {
 }
 
 impl fmt::Display for Profile {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Profile::Debug => write!(f, "debug"),
-            Profile::Release => write!(f, "release"),
+            Profile::Debug => write!(fmt, "debug"),
+            Profile::Release => write!(fmt, "release"),
         }
     }
 }

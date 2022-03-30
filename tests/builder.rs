@@ -254,7 +254,7 @@ fn should_report_about_build_failure() {
 
     let crate_absoulte_path_str = crate_absoulte_path.display().to_string();
 
-    match output.unwrap_err().downcast_ref().unwrap() {
+    match output.unwrap_err().kind() {
         BuildErrorKind::BuildFailed(diagnostics) => {
             assert_eq!(
                 diagnostics

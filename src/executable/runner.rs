@@ -1,10 +1,9 @@
 use std::{ffi::OsStr, path::Path, process::Command};
 
-use anyhow::Context;
 use regex::Regex;
 use semver::Version;
 
-use crate::error::{BuildErrorKind, Error, Result};
+use crate::error::{BuildErrorKind, Error, Result, ResultExt};
 
 use super::{process::streaming_output, Executable};
 

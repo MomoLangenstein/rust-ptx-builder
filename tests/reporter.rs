@@ -1,5 +1,3 @@
-use anyhow::Context;
-
 use ptx_builder::{error::*, reporter::ErrorLogPrinter};
 
 #[test]
@@ -10,17 +8,20 @@ fn should_report_in_cargo_style() {
         stderr: String::from("some\nmultiline\noutput"),
     }));
 
-    let chained_error = original_error
-        .with_context(|| BuildErrorKind::InternalError(String::from("internal error")));
+    let chained_error = original_error.map_err(|err| {
+        err.context(BuildErrorKind::InternalError(String::from(
+            "internal error",
+        )))
+    });
 
-    let chained_error = chained_error.with_context(|| {
-        BuildErrorKind::BuildFailed(vec![
+    let chained_error = chained_error.map_err(|err| {
+        err.context(BuildErrorKind::BuildFailed(vec![
             String::from("error[E0425]: cannot find function `external_fn` in this scope"),
             String::from(" --> src/lib.rs:6:20"),
             String::from("  |"),
             String::from("6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;"),
             String::from("  |                    ^^^^^^^^^^^ not found in this scope"),
-        ])
+        ]))
     });
 
     let mut reporter = ErrorLogPrinter::print(chained_error.unwrap_err());
@@ -33,14 +34,12 @@ fn should_report_in_cargo_style() {
 [PTX]   |
 [PTX] 6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;
 [PTX]   |                    ^^^^^^^^^^^ not found in this scope
-[PTX]
-[PTX] caused by:
-[PTX]   Internal error: internal error
-[PTX]
-[PTX] caused by:
-[PTX]   Command failed: 'some_name' with code '0' and output:
-[PTX]   some
-[PTX]   multiline
-[PTX]   output"
+[PTX] 
+[PTX] Caused by:
+[PTX]     0: Internal error: internal error
+[PTX]     1: Command failed: 'some_name' with code '0' and output:
+[PTX]        some
+[PTX]        multiline
+[PTX]        output"
     );
 }

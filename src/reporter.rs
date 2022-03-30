@@ -136,30 +136,10 @@ impl StringExt for String {
 }
 
 impl fmt::Display for ErrorLogPrinter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         control::set_override(self.colors);
 
-        write!(
-            f,
-            "{}",
-            self.error
-                .to_string()
-                .prefix_each_line("[PTX] ".bright_black())
-        )?;
-
-        for next in self.error.chain().skip(1) {
-            write!(
-                f,
-                "\n{}",
-                String::from("\n caused by:").prefix_each_line("[PTX]".bright_black())
-            )?;
-
-            write!(
-                f,
-                "\n{}",
-                next.to_string().prefix_each_line("[PTX]   ".bright_black())
-            )?;
-        }
+        fmt.write_str(&format!("{:?}", self.error).prefix_each_line("[PTX] ".bright_black()))?;
 
         control::unset_override();
         Ok(())

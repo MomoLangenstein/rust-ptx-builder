@@ -26,7 +26,7 @@ mod cargo {
             .with_cwd("tests/fixtures/sample-crate")
             .run();
 
-        match output.unwrap_err().downcast_ref().unwrap() {
+        match output.unwrap_err().kind() {
             BuildErrorKind::CommandFailed {
                 command,
                 code,
@@ -70,7 +70,7 @@ mod non_existing_command {
     fn should_not_provide_output() {
         let output = ExecutableRunner::new(NonExistingCommand).run();
 
-        match output.unwrap_err().downcast_ref().unwrap() {
+        match output.unwrap_err().kind() {
             BuildErrorKind::CommandNotFound { command, hint } => {
                 assert_eq!(command, "almost-unique-name");
                 assert_eq!(hint, "Some useful hint");
@@ -108,7 +108,7 @@ mod unrealistic_version_requirement {
     fn should_not_provide_output() {
         let output = ExecutableRunner::new(UnrealisticCommand).run();
 
-        match output.unwrap_err().downcast_ref().unwrap() {
+        match output.unwrap_err().kind() {
             BuildErrorKind::CommandVersionNotFulfilled {
                 command,
                 required,

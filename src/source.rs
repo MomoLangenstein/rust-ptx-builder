@@ -6,11 +6,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Context;
-
 use crate::{
     builder::CrateType,
-    error::{BuildErrorKind, Result},
+    error::{BuildErrorKind, Result, ResultExt},
 };
 
 #[derive(Hash, Clone, Debug)]
@@ -131,11 +129,11 @@ impl Crate {
     /// Returns the crate type to build the PTX with
     pub fn get_crate_type(&self, crate_type: Option<CrateType>) -> Result<&str> {
         match (&self.deps_file_prefix, crate_type) {
-            (FilePrefix::Library(_), Some(CrateType::Library) | None) => Ok("cdylib"),
-            (FilePrefix::Binary(_), Some(CrateType::Binary) | None) => Ok("bin"),
+            (FilePrefix::Library(_), Some(CrateType::Library) | None)
+            | (FilePrefix::Mixed { .. }, Some(CrateType::Library)) => Ok("cdylib"),
 
-            (FilePrefix::Mixed { .. }, Some(CrateType::Library)) => Ok("cdylib"),
-            (FilePrefix::Mixed { .. }, Some(CrateType::Binary)) => Ok("bin"),
+            (FilePrefix::Binary(_), Some(CrateType::Binary) | None)
+            | (FilePrefix::Mixed { .. }, Some(CrateType::Binary)) => Ok("bin"),
 
             (FilePrefix::Mixed { .. }, None) => {
                 bail!(BuildErrorKind::MissingCrateType);
@@ -201,9 +199,7 @@ fn should_find_crate_names() {
     match source
         .get_deps_file_prefix(Some(CrateType::Binary))
         .unwrap_err()
-        .root_cause()
-        .downcast_ref()
-        .unwrap()
+        .kind()
     {
         BuildErrorKind::InvalidCrateType(kind) => {
             assert_eq!(kind, "Binary");
@@ -234,9 +230,7 @@ fn should_find_app_crate_names() {
     match source
         .get_deps_file_prefix(Some(CrateType::Library))
         .unwrap_err()
-        .root_cause()
-        .downcast_ref()
-        .unwrap()
+        .kind()
     {
         BuildErrorKind::InvalidCrateType(kind) => {
             assert_eq!(kind, "Library");
@@ -266,13 +260,7 @@ fn should_find_mixed_crate_names() {
         "libmixed_crate"
     );
 
-    match source
-        .get_deps_file_prefix(None)
-        .unwrap_err()
-        .root_cause()
-        .downcast_ref()
-        .unwrap()
-    {
+    match source.get_deps_file_prefix(None).unwrap_err().kind() {
         BuildErrorKind::MissingCrateType => {}
         _ => unreachable!("it should fail with proper error"),
     }
@@ -282,7 +270,7 @@ fn should_find_mixed_crate_names() {
 fn should_check_existence_of_crate_path() {
     let result = Crate::analyse("tests/fixtures/non-existing-crate");
 
-    match result.unwrap_err().downcast_ref().unwrap() {
+    match result.unwrap_err().kind() {
         BuildErrorKind::InvalidCratePath(path) => {
             assert!(path.ends_with("tests/fixtures/non-existing-crate"));
         }
@@ -295,7 +283,7 @@ fn should_check_existence_of_crate_path() {
 fn should_check_validity_of_crate_path() {
     let result = Crate::analyse("tests/builder.rs");
 
-    match result.unwrap_err().downcast_ref().unwrap() {
+    match result.unwrap_err().kind() {
         BuildErrorKind::InvalidCratePath(path) => {
             assert!(path.ends_with("tests/builder.rs"));
         }

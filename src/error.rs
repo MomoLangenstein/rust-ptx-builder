@@ -10,8 +10,84 @@ macro_rules! bail {
     };
 }
 
-pub type Error = anyhow::Error;
-pub type Result<T> = anyhow::Result<T>;
+#[derive(thiserror::Error)]
+pub struct Error {
+    #[source]
+    #[backtrace]
+    error: anyhow::Error,
+    context: BuildErrorKind,
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.error.fmt(fmt)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.error.fmt(fmt)
+    }
+}
+
+impl From<BuildErrorKind> for Error {
+    fn from(context: BuildErrorKind) -> Self {
+        Self {
+            error: anyhow::Error::new(context.clone()),
+            context,
+        }
+    }
+}
+
+impl Error {
+    #[must_use]
+    pub fn kind(&self) -> &BuildErrorKind {
+        &self.context
+    }
+
+    #[must_use]
+    pub fn context(self, context: BuildErrorKind) -> Self {
+        Self {
+            error: self.error.context(context.clone()),
+            context,
+        }
+    }
+}
+
+pub(crate) trait ResultExt<T, C> {
+    fn context(self, context: C) -> Result<T, Error>;
+
+    fn with_context<F: FnOnce() -> C>(self, f: F) -> Result<T, Error>;
+}
+
+impl<T, E: std::error::Error + Send + Sync + 'static> ResultExt<T, BuildErrorKind>
+    for Result<T, E>
+{
+    fn context(self, context: BuildErrorKind) -> Result<T, Error> {
+        anyhow::Context::with_context(self, || context.clone())
+            .map_err(|error| Error { error, context })
+    }
+
+    fn with_context<F: FnOnce() -> BuildErrorKind>(self, f: F) -> Result<T, Error> {
+        if let Ok(val) = self {
+            return Ok(val);
+        }
+
+        self.context(f())
+    }
+}
+
+impl<'a, T, E: std::error::Error + Send + Sync + 'static> ResultExt<T, &'a str> for Result<T, E> {
+    fn context(self, context: &'a str) -> Result<T, Error> {
+        self.with_context(|| BuildErrorKind::InternalError(String::from(context)))
+    }
+
+    fn with_context<F: FnOnce() -> &'a str>(self, f: F) -> Result<T, Error> {
+        self.with_context(|| BuildErrorKind::InternalError(String::from(f())))
+    }
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, PartialEq, thiserror::Error, Clone)]
 pub enum BuildErrorKind {
@@ -41,7 +117,7 @@ pub enum BuildErrorKind {
 }
 
 impl fmt::Display for BuildErrorKind {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use BuildErrorKind::{
             BuildFailed, CommandFailed, CommandNotFound, CommandVersionNotFulfilled, InternalError,
             InvalidCratePath, InvalidCrateType, MissingCrateType, OtherError,
@@ -49,7 +125,7 @@ impl fmt::Display for BuildErrorKind {
 
         match self {
             CommandNotFound { command, hint } => write!(
-                formatter,
+                fmt,
                 "Command not found in PATH: '{}'. {}.",
                 command.bold(),
                 hint.underline()
@@ -60,7 +136,7 @@ impl fmt::Display for BuildErrorKind {
                 code,
                 stderr,
             } => write!(
-                formatter,
+                fmt,
                 "Command failed: '{}' with code '{}' and output:\n{}",
                 command.bold(),
                 code,
@@ -73,7 +149,7 @@ impl fmt::Display for BuildErrorKind {
                 required,
                 hint,
             } => write!(
-                formatter,
+                fmt,
                 "Command version is not fulfilled: '{}' is currently '{}' but '{}' is required. \
                  {}.",
                 command.bold(),
@@ -83,34 +159,34 @@ impl fmt::Display for BuildErrorKind {
             ),
 
             InvalidCratePath(path) => write!(
-                formatter,
+                fmt,
                 "{}: {}",
                 "Invalid device crate path".bold(),
                 path.display()
             ),
 
             BuildFailed(lines) => write!(
-                formatter,
+                fmt,
                 "{}\n{}",
                 "Unable to build a PTX crate!".bold(),
                 lines.join("\n")
             ),
 
             InvalidCrateType(crate_type) => write!(
-                formatter,
+                fmt,
                 "{}: the crate cannot be build as '{}'",
                 "Impossible CrateType".bold(),
                 crate_type
             ),
 
             MissingCrateType => write!(
-                formatter,
+                fmt,
                 "{}: it's mandatory for mixed-type crates",
                 "Missing CrateType".bold()
             ),
 
-            InternalError(message) => write!(formatter, "{}: {}", "Internal error".bold(), message),
-            OtherError => write!(formatter, "Other error"),
+            InternalError(message) => write!(fmt, "{}: {}", "Internal error".bold(), message),
+            OtherError => write!(fmt, "Other error"),
         }
     }
 }
