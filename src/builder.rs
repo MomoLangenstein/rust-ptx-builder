@@ -381,17 +381,26 @@ impl Builder {
             Self::store_cached_build_command(&output_path, &self.prefix, command)?;
         }
 
-        let file_suffix = match SUFFIX_REGEX.captures(&build_command) {
-            Some(caps) => caps[1].to_string(),
-
-            None => {
-                bail!(BuildErrorKind::InternalError(String::from(
-                    "Unable to find `extra-filename` rustc flag",
-                )));
-            }
+        let (file_suffix, found_suffix) = match SUFFIX_REGEX.captures(&build_command) {
+            Some(caps) => (caps[1].to_string(), true),
+            None => (String::new(), false),
         };
 
-        Ok(BuildOutput::new(self, output_path, file_suffix))
+        let output = BuildOutput::new(self, output_path, file_suffix);
+
+        if output.get_assembly_path().exists() {
+            Ok(output)
+        } else if found_suffix {
+            Err(BuildErrorKind::InternalError(String::from(
+                "Unable to find PTX assembly as specified by `extra-filename` rustc flag",
+            ))
+            .into())
+        } else {
+            Err(BuildErrorKind::InternalError(String::from(
+                "Unable to find `extra-filename` rustc flag",
+            ))
+            .into())
+        }
     }
 
     fn output_is_not_verbose(line: &str) -> bool {
