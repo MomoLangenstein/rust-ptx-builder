@@ -139,7 +139,9 @@ impl fmt::Display for ErrorLogPrinter {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         control::set_override(self.colors);
 
-        fmt.write_str(&format!("{:?}", self.error).prefix_each_line("[PTX] ".bright_black()))?;
+        fmt.write_str(
+            &format!("{:?}", self.error).prefix_each_line("[PTX] ".bright_black().bold()),
+        )?;
 
         control::unset_override();
         Ok(())

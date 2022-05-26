@@ -89,7 +89,7 @@ impl<'a, T, E: std::error::Error + Send + Sync + 'static> ResultExt<T, &'a str> 
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Debug, PartialEq, thiserror::Error, Clone)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, Clone)]
 pub enum BuildErrorKind {
     CommandNotFound {
         command: String,

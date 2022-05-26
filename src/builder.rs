@@ -64,7 +64,7 @@ pub enum BuildStatus<'a> {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Profile {
     /// Equivalent for `cargo-build` **without** `--release` flag.
     Debug,
@@ -87,7 +87,7 @@ pub enum Profile {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MessageFormat {
     /// Equivalent for `cargo-build` with `--message-format=human` flag
     /// (default).
@@ -182,6 +182,12 @@ impl Builder {
         let is_recursive_build = recursive_env.map_or(false, |recursive_env| recursive_env == "1");
 
         !is_recursive_build
+    }
+
+    /// Returns the name of the source crate at the construction `path`.
+    #[must_use]
+    pub fn get_crate_name(&self) -> &str {
+        self.source_crate.get_name()
     }
 
     /// Disable colors for internal calls to `cargo`.
@@ -302,6 +308,7 @@ impl Builder {
         let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
 
         args.push("--");
+
         args.push("--crate-type");
         args.push(crate_type);
 
