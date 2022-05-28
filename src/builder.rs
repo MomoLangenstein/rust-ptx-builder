@@ -1,7 +1,7 @@
 use std::{
     env, fmt,
     fs::{read_to_string, write, File},
-    io::{BufReader, Read},
+    io::{BufReader, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -290,7 +290,7 @@ impl Builder {
         args.push("--target");
         args.push(TARGET_NAME);
 
-        match self.crate_type {
+        /*match self.crate_type {
             Some(CrateType::Binary) => {
                 args.push("--bin");
                 args.push(self.source_crate.get_name());
@@ -301,15 +301,55 @@ impl Builder {
             }
 
             _ => {}
-        }
+        }*/
+
+        args.push("--example");
+        let example_name = format!("{}-{}", self.source_crate.get_name(), self.prefix);
+        args.push(&example_name);
+
+        let lock = loop {
+            if let Ok(lock) =
+                lockfile::Lockfile::create(self.source_crate.get_path().join("ptx-builder.lock"))
+            {
+                break lock;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+
+        let mut reader = BufReader::new(
+            std::fs::File::open(self.source_crate.get_path().join("Cargo.toml"))
+                .context(BuildErrorKind::OtherError)?,
+        );
+        let mut old_cargo_toml = String::new();
+        reader
+            .read_to_string(&mut old_cargo_toml)
+            .context(BuildErrorKind::OtherError)?;
+
+        let new_cargo_toml = old_cargo_toml.replace(
+            &format!("{}-ptx-builder", self.source_crate.get_name()),
+            &example_name,
+        );
+
+        let mut writer = std::io::BufWriter::new(
+            std::fs::File::options()
+                .write(true)
+                .truncate(true)
+                .open(self.source_crate.get_path().join("Cargo.toml"))
+                .context(BuildErrorKind::OtherError)?,
+        );
+        writer
+            .write_all(new_cargo_toml.as_bytes())
+            .context(BuildErrorKind::OtherError)?;
+        writer.flush().context(BuildErrorKind::OtherError)?;
+        std::mem::drop(writer);
 
         args.push("-v");
-
-        let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
 
         args.push("--");
 
         args.push("--crate-type");
+        let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
         args.push(crate_type);
 
         let output_path = {
@@ -343,11 +383,26 @@ impl Builder {
                     Error::from(BuildErrorKind::BuildFailed(lines))
                 }
                 _ => error,
-            })?;
+            });
+
+        let mut writer = std::io::BufWriter::new(
+            std::fs::File::options()
+                .write(true)
+                .truncate(true)
+                .open(self.source_crate.get_path().join("Cargo.toml"))
+                .context(BuildErrorKind::OtherError)?,
+        );
+        writer
+            .write_all(old_cargo_toml.as_bytes())
+            .context(BuildErrorKind::OtherError)?;
+        writer.flush().context(BuildErrorKind::OtherError)?;
+        std::mem::drop(writer);
+
+        std::mem::drop(lock);
 
         Ok(BuildStatus::Success(self.prepare_output(
             output_path,
-            &cargo_output.stderr,
+            &cargo_output?.stderr,
             crate_type,
         )?))
     }
@@ -469,10 +524,11 @@ impl<'a> BuildOutput<'a> {
         self.output_path
             .join(TARGET_NAME)
             .join(self.builder.profile.to_string())
-            .join("deps")
+            .join("examples")
             .join(format!(
-                "{}{}.ptx",
+                "{}_{}{}.ptx",
                 self.builder.source_crate.get_output_file_prefix(),
+                self.builder.prefix,
                 self.file_suffix,
             ))
     }
@@ -544,6 +600,7 @@ impl<'a> BuildOutput<'a> {
             .output_path
             .join(TARGET_NAME)
             .join(self.builder.profile.to_string())
+            .join("examples")
             .join(format!(
                 "{}.d",
                 self.builder

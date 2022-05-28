@@ -130,7 +130,7 @@ impl Crate {
     pub fn get_crate_type(&self, crate_type: Option<CrateType>) -> Result<&str> {
         match (&self.deps_file_prefix, crate_type) {
             (FilePrefix::Library(_), Some(CrateType::Library) | None)
-            | (FilePrefix::Mixed { .. }, Some(CrateType::Library)) => Ok("cdylib,rlib"),
+            | (FilePrefix::Mixed { .. }, Some(CrateType::Library)) => Ok("cdylib"),
 
             (FilePrefix::Binary(_), Some(CrateType::Binary) | None)
             | (FilePrefix::Mixed { .. }, Some(CrateType::Binary)) => Ok("bin"),

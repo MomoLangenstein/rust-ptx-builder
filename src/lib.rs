@@ -1,6 +1,5 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::missing_errors_doc)]
-#![deny(warnings)]
 #![allow(clippy::useless_attribute)]
 #![feature(backtrace)]
 
