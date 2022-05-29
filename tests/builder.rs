@@ -363,7 +363,7 @@ fn should_not_get_built_recursively() {
     env::set_var("PTX_CRATE_BUILDING", "1");
 
     assert!(!Builder::is_build_needed());
-    let builder = Builder::new("tests/fixtures/sample-crate").unwrap();
+    let builder = Builder::new("tests/fixtures/app-crate").unwrap();
 
     match builder.disable_colors().build().unwrap() {
         BuildStatus::NotNeeded => {}

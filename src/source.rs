@@ -105,13 +105,13 @@ impl Crate {
     }
 
     /// Returns the crate type to build the PTX with
-    pub fn get_crate_type(&self, crate_type: Option<ChosenCrateType>) -> Result<&str> {
+    pub fn get_crate_type(&self, crate_type: Option<ChosenCrateType>) -> Result<ChosenCrateType> {
         match (&self.crate_type, crate_type) {
             (CrateType::Library, Some(ChosenCrateType::Library) | None)
-            | (CrateType::Mixed, Some(ChosenCrateType::Library)) => Ok("cdylib"),
+            | (CrateType::Mixed, Some(ChosenCrateType::Library)) => Ok(ChosenCrateType::Library),
 
             (CrateType::Binary, Some(ChosenCrateType::Binary) | None)
-            | (CrateType::Mixed, Some(ChosenCrateType::Binary)) => Ok("bin"),
+            | (CrateType::Mixed, Some(ChosenCrateType::Binary)) => Ok(ChosenCrateType::Binary),
 
             (CrateType::Mixed, None) => {
                 bail!(BuildErrorKind::MissingCrateType);

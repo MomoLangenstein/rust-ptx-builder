@@ -5,6 +5,10 @@ name = "sample-app-ptx_crate"
 version = "0.1.0"
 authors = ["Denys Zariaiev <denys.zariaiev@gmail.com>"]
 
+[[example]]
+name = "sample-app-ptx_crate-ptx-builder"
+path = "src/main.rs"
+
 [dependencies.either]
 version = "1.5"
 default-features = false

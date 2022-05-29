@@ -1,12 +1,9 @@
 use std::{
     env, fmt,
-    fs::{read_to_string, write, File},
+    fs::File,
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
 };
-
-use lazy_static::lazy_static;
-use regex::Regex;
 
 use crate::{
     error::{BuildErrorKind, Error, Result, ResultExt},
@@ -14,7 +11,6 @@ use crate::{
     source::Crate,
 };
 
-const LAST_BUILD_CMD: &str = ".last-build-command";
 const TARGET_NAME: &str = "nvptx64-nvidia-cuda";
 
 /// Core of the crate - PTX assembly build controller.
@@ -34,7 +30,7 @@ pub struct Builder {
 pub struct BuildOutput<'a> {
     builder: &'a Builder,
     output_path: PathBuf,
-    file_suffix: String,
+    crate_type: CrateType,
 }
 
 /// Non-failed build status.
@@ -369,7 +365,10 @@ impl Builder {
 
         args.push("--crate-type");
         let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
-        args.push(crate_type);
+        args.push(match crate_type {
+            CrateType::Binary => "bin",
+            CrateType::Library => "cdylib",
+        });
 
         cargo
             .with_args(&args)
@@ -415,68 +414,17 @@ impl Builder {
             .unlock()
             .context("Unable to unlock 'ptx-builder.lock'")?;
 
-        Ok(BuildStatus::Success(self.prepare_output(
-            output_path,
-            &cargo_output?.stderr,
-            crate_type,
-        )?))
-    }
+        let _cargo_output = cargo_output?;
 
-    fn prepare_output(
-        &self,
-        output_path: PathBuf,
-        cargo_stderr: &str,
-        crate_type: &str,
-    ) -> Result<BuildOutput> {
-        lazy_static! {
-            static ref SUFFIX_REGEX: Regex =
-                Regex::new(r"-C extra-filename=([\S]+)").expect("Unable to parse regex...");
-        }
-
-        let crate_name = self.source_crate.get_output_file_prefix();
-
-        // We need the build command to get real output filename.
-        let build_command = {
-            #[allow(clippy::manual_find_map)]
-            cargo_stderr
-                .trim_matches('\n')
-                .split('\n')
-                .find(|line| {
-                    line.contains(&format!("--crate-name {}", crate_name))
-                        && line.contains(&format!("--crate-type {}", crate_type))
-                })
-                .map(|line| BuildCommand::Realtime(line.to_string()))
-                .or_else(|| Self::load_cached_build_command(&output_path, &self.prefix))
-                .ok_or_else(|| {
-                    Error::from(BuildErrorKind::InternalError(String::from(
-                        "Unable to find build command of the device crate",
-                    )))
-                })?
-        };
-
-        if let BuildCommand::Realtime(ref command) = build_command {
-            Self::store_cached_build_command(&output_path, &self.prefix, command)?;
-        }
-
-        let (file_suffix, found_suffix) = match SUFFIX_REGEX.captures(&build_command) {
-            Some(caps) => (caps[1].to_string(), true),
-            None => (String::new(), false),
-        };
-
-        let output = BuildOutput::new(self, output_path, file_suffix);
+        let output = BuildOutput::new(self, output_path, crate_type);
 
         if output.get_assembly_path().exists() {
-            Ok(output)
-        } else if found_suffix {
-            Err(BuildErrorKind::InternalError(String::from(
-                "Unable to find PTX assembly as specified by `extra-filename` rustc flag",
-            ))
-            .into())
+            Ok(BuildStatus::Success(output))
         } else {
-            Err(BuildErrorKind::InternalError(String::from(
-                "Unable to find `extra-filename` rustc flag",
-            ))
-            .into())
+            Err(
+                BuildErrorKind::InternalError(String::from("Unable to find PTX assembly output"))
+                    .into(),
+            )
         }
     }
 
@@ -487,31 +435,14 @@ impl Builder {
             && !line.starts_with("Caused by:")
             && !line.starts_with("  process didn\'t exit successfully: ")
     }
-
-    fn load_cached_build_command(output_path: &Path, prefix: &str) -> Option<BuildCommand> {
-        match read_to_string(output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix))) {
-            Ok(contents) => Some(BuildCommand::Cached(contents)),
-            Err(_) => None,
-        }
-    }
-
-    fn store_cached_build_command(output_path: &Path, prefix: &str, command: &str) -> Result<()> {
-        write(
-            output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix)),
-            command.as_bytes(),
-        )
-        .context(BuildErrorKind::OtherError)?;
-
-        Ok(())
-    }
 }
 
 impl<'a> BuildOutput<'a> {
-    fn new(builder: &'a Builder, output_path: PathBuf, file_suffix: String) -> Self {
+    fn new(builder: &'a Builder, output_path: PathBuf, crate_type: CrateType) -> Self {
         BuildOutput {
             builder,
             output_path,
-            file_suffix,
+            crate_type,
         }
     }
 
@@ -541,10 +472,16 @@ impl<'a> BuildOutput<'a> {
             .join(self.builder.profile.to_string())
             .join("examples")
             .join(format!(
-                "{}_{}{}.ptx",
-                self.builder.source_crate.get_output_file_prefix(),
+                "{}{}{}.ptx",
+                match self.crate_type {
+                    CrateType::Binary => self.builder.source_crate.get_name(),
+                    CrateType::Library => self.builder.source_crate.get_output_file_prefix(),
+                },
+                match self.crate_type {
+                    CrateType::Binary => '-',
+                    CrateType::Library => '_',
+                },
                 self.builder.prefix,
-                self.file_suffix,
             ))
     }
 
@@ -617,8 +554,15 @@ impl<'a> BuildOutput<'a> {
             .join(self.builder.profile.to_string())
             .join("examples")
             .join(format!(
-                "{}_{}.d",
-                self.builder.source_crate.get_output_file_prefix(),
+                "{}{}{}.d",
+                match self.crate_type {
+                    CrateType::Binary => self.builder.source_crate.get_name(),
+                    CrateType::Library => self.builder.source_crate.get_output_file_prefix(),
+                },
+                match self.crate_type {
+                    CrateType::Binary => '-',
+                    CrateType::Library => '_',
+                },
                 self.builder.prefix,
             ));
 
@@ -640,21 +584,6 @@ impl fmt::Display for Profile {
         match self {
             Profile::Debug => write!(fmt, "debug"),
             Profile::Release => write!(fmt, "release"),
-        }
-    }
-}
-
-enum BuildCommand {
-    Realtime(String),
-    Cached(String),
-}
-
-impl std::ops::Deref for BuildCommand {
-    type Target = str;
-
-    fn deref(&self) -> &str {
-        match self {
-            BuildCommand::Realtime(line) | BuildCommand::Cached(line) => line,
         }
     }
 }
