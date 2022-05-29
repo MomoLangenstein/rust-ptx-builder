@@ -7,15 +7,15 @@ use std::{
 };
 
 use crate::{
-    builder::CrateType,
+    builder::CrateType as ChosenCrateType,
     error::{BuildErrorKind, Result, ResultExt},
 };
 
 #[derive(Hash, Clone, Debug)]
-pub enum FilePrefix {
-    Library(String),
-    Binary(String),
-    Mixed { lib: String, bin: String },
+pub enum CrateType {
+    Library,
+    Binary,
+    Mixed,
 }
 
 #[derive(Hash, Clone, Debug)]
@@ -24,7 +24,7 @@ pub struct Crate {
     name: String,
     path: PathBuf,
     output_file_prefix: String,
-    deps_file_prefix: FilePrefix,
+    crate_type: CrateType,
 }
 
 impl Crate {
@@ -78,15 +78,10 @@ impl Crate {
 
         let output_file_prefix = cargo_toml_name.replace('-', "_");
 
-        let deps_file_prefix = match (is_binary, is_library) {
-            (false, true) => FilePrefix::Library(format!("lib{}", output_file_prefix)),
-            (true, false) => FilePrefix::Binary(cargo_toml_name.to_string()),
-
-            (true, true) => FilePrefix::Mixed {
-                lib: format!("lib{}", output_file_prefix),
-                bin: cargo_toml_name.to_string(),
-            },
-
+        let crate_type = match (is_binary, is_library) {
+            (false, true) => CrateType::Library,
+            (true, false) => CrateType::Binary,
+            (true, true) => CrateType::Mixed,
             (false, false) => {
                 bail!(BuildErrorKind::InternalError(
                     "Unable to find neither `src/lib.rs` nor `src/main.rs` \
@@ -100,7 +95,7 @@ impl Crate {
             name: cargo_toml_name.to_string(),
             path,
             output_file_prefix,
-            deps_file_prefix,
+            crate_type,
         })
     }
 
@@ -109,45 +104,24 @@ impl Crate {
         &self.output_file_prefix
     }
 
-    /// Returns deps file filename prefix.
-    pub fn get_deps_file_prefix(&self, crate_type: Option<CrateType>) -> Result<String> {
-        match (&self.deps_file_prefix, crate_type) {
-            (FilePrefix::Library(prefix), Some(CrateType::Library) | None)
-            | (FilePrefix::Binary(prefix), Some(CrateType::Binary) | None) => Ok(prefix.clone()),
-            (FilePrefix::Mixed { bin, .. }, Some(CrateType::Binary)) => Ok(bin.clone()),
-            (FilePrefix::Mixed { lib, .. }, Some(CrateType::Library)) => Ok(lib.clone()),
-            (FilePrefix::Mixed { .. }, None) => {
-                bail!(BuildErrorKind::MissingCrateType);
-            }
-
-            (FilePrefix::Library(_), Some(CrateType::Binary)) => {
-                bail!(BuildErrorKind::InvalidCrateType("Binary".into()));
-            }
-
-            (FilePrefix::Binary(_), Some(CrateType::Library)) => {
-                bail!(BuildErrorKind::InvalidCrateType("Library".into()));
-            }
-        }
-    }
-
     /// Returns the crate type to build the PTX with
-    pub fn get_crate_type(&self, crate_type: Option<CrateType>) -> Result<&str> {
-        match (&self.deps_file_prefix, crate_type) {
-            (FilePrefix::Library(_), Some(CrateType::Library) | None)
-            | (FilePrefix::Mixed { .. }, Some(CrateType::Library)) => Ok("cdylib"),
+    pub fn get_crate_type(&self, crate_type: Option<ChosenCrateType>) -> Result<&str> {
+        match (&self.crate_type, crate_type) {
+            (CrateType::Library, Some(ChosenCrateType::Library) | None)
+            | (CrateType::Mixed, Some(ChosenCrateType::Library)) => Ok("cdylib"),
 
-            (FilePrefix::Binary(_), Some(CrateType::Binary) | None)
-            | (FilePrefix::Mixed { .. }, Some(CrateType::Binary)) => Ok("bin"),
+            (CrateType::Binary, Some(ChosenCrateType::Binary) | None)
+            | (CrateType::Mixed, Some(ChosenCrateType::Binary)) => Ok("bin"),
 
-            (FilePrefix::Mixed { .. }, None) => {
+            (CrateType::Mixed, None) => {
                 bail!(BuildErrorKind::MissingCrateType);
             }
 
-            (FilePrefix::Library(_), Some(CrateType::Binary)) => {
+            (CrateType::Library, Some(ChosenCrateType::Binary)) => {
                 bail!(BuildErrorKind::InvalidCrateType("Binary".into()));
             }
 
-            (FilePrefix::Binary(_), Some(CrateType::Library)) => {
+            (CrateType::Binary, Some(ChosenCrateType::Library)) => {
                 bail!(BuildErrorKind::InvalidCrateType("Library".into()));
             }
         }
@@ -187,30 +161,6 @@ fn should_find_crate_names() {
     let source = Crate::analyse("tests/fixtures/sample-crate").unwrap();
 
     assert_eq!(source.get_output_file_prefix(), "sample_ptx_crate");
-
-    assert_eq!(
-        source.get_deps_file_prefix(None).unwrap(),
-        "libsample_ptx_crate"
-    );
-
-    assert_eq!(
-        source
-            .get_deps_file_prefix(Some(CrateType::Library))
-            .unwrap(),
-        "libsample_ptx_crate"
-    );
-
-    match source
-        .get_deps_file_prefix(Some(CrateType::Binary))
-        .unwrap_err()
-        .kind()
-    {
-        BuildErrorKind::InvalidCrateType(kind) => {
-            assert_eq!(kind, "Binary");
-        }
-
-        _ => unreachable!("it should fail with proper error"),
-    }
 }
 
 #[test]
@@ -218,30 +168,6 @@ fn should_find_app_crate_names() {
     let source = Crate::analyse("tests/fixtures/app-crate").unwrap();
 
     assert_eq!(source.get_output_file_prefix(), "sample_app_ptx_crate");
-
-    assert_eq!(
-        source.get_deps_file_prefix(None).unwrap(),
-        "sample-app-ptx_crate"
-    );
-
-    assert_eq!(
-        source
-            .get_deps_file_prefix(Some(CrateType::Binary))
-            .unwrap(),
-        "sample-app-ptx_crate"
-    );
-
-    match source
-        .get_deps_file_prefix(Some(CrateType::Library))
-        .unwrap_err()
-        .kind()
-    {
-        BuildErrorKind::InvalidCrateType(kind) => {
-            assert_eq!(kind, "Library");
-        }
-
-        _ => unreachable!("it should fail with proper error"),
-    }
 }
 
 #[test]
@@ -249,25 +175,6 @@ fn should_find_mixed_crate_names() {
     let source = Crate::analyse("tests/fixtures/mixed-crate").unwrap();
 
     assert_eq!(source.get_output_file_prefix(), "mixed_crate");
-
-    assert_eq!(
-        source
-            .get_deps_file_prefix(Some(CrateType::Binary))
-            .unwrap(),
-        "mixed-crate"
-    );
-
-    assert_eq!(
-        source
-            .get_deps_file_prefix(Some(CrateType::Library))
-            .unwrap(),
-        "libmixed_crate"
-    );
-
-    match source.get_deps_file_prefix(None).unwrap_err().kind() {
-        BuildErrorKind::MissingCrateType => {}
-        _ => unreachable!("it should fail with proper error"),
-    }
 }
 
 #[test]

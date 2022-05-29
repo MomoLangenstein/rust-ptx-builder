@@ -617,10 +617,9 @@ impl<'a> BuildOutput<'a> {
             .join(self.builder.profile.to_string())
             .join("examples")
             .join(format!(
-                "{}.d",
-                self.builder
-                    .source_crate
-                    .get_deps_file_prefix(self.builder.crate_type)?
+                "{}_{}.d",
+                self.builder.source_crate.get_output_file_prefix(),
+                self.builder.prefix,
             ));
 
         let mut crate_deps_reader =

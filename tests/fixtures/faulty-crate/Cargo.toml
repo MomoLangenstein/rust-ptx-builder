@@ -4,3 +4,8 @@
 name = "faulty-ptx_crate"
 version = "0.1.0"
 authors = ["Denys Zariaiev <denys.zariaiev@gmail.com>"]
+
+[[example]]
+name = "faulty-ptx_crate-ptx-builder"
+path = "src/lib.rs"
+crate-type = ["cdylib"]

@@ -171,7 +171,7 @@ fn should_handle_rebuild_without_changes() {
     cleanup_temp_location();
 
     let builder = {
-        Builder::new("tests/fixtures/app-crate")
+        Builder::new("tests/fixtures/sample-crate")
             .unwrap()
             .disable_colors()
     };
