@@ -238,6 +238,7 @@ impl Builder {
         self.build_live(|_line| (), |_line| ())
     }
 
+    #[allow(clippy::too_many_lines)]
     /// Performs an actual build: runs `cargo` with proper flags and
     /// environment.
     pub fn build_live<O: FnMut(&str), E: FnMut(&str)>(
@@ -290,32 +291,49 @@ impl Builder {
         args.push("--target");
         args.push(TARGET_NAME);
 
-        /*match self.crate_type {
-            Some(CrateType::Binary) => {
-                args.push("--bin");
-                args.push(self.source_crate.get_name());
-            }
-
-            Some(CrateType::Library) => {
-                args.push("--lib");
-            }
-
-            _ => {}
-        }*/
-
         args.push("--example");
         let example_name = format!("{}-{}", self.source_crate.get_name(), self.prefix);
         args.push(&example_name);
 
-        let lock = loop {
-            if let Ok(lock) =
-                lockfile::Lockfile::create(self.source_crate.get_path().join("ptx-builder.lock"))
-            {
-                break lock;
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(10));
+        let output_path = {
+            self.source_crate
+                .get_output_path()
+                .context("Unable to create output path")?
         };
+
+        let mut lock_file = fslock::LockFile::open(&output_path.join(".ptx-builder.lock"))
+            .context("Unable to create the lockfile for the ptx-builder")?;
+        lock_file
+            .lock()
+            .context("Unable to lock the lockfile for the ptx-builder")?;
+
+        let mut lock_file_inner = std::fs::File::options()
+            .read(true)
+            .open(output_path.join(".ptx-builder.lock"))
+            .context("Unable to open the lockfile for the ptx-builder")?;
+        let mut prior_example_name = String::new();
+        lock_file_inner
+            .read_to_string(&mut prior_example_name)
+            .context("Unable to read from the lockfile for the ptx-builder")?;
+        std::mem::drop(lock_file_inner);
+
+        if prior_example_name.is_empty() {
+            prior_example_name.push_str(self.source_crate.get_name());
+            prior_example_name.push_str("-ptx-builder");
+        }
+
+        let mut lock_file_inner = std::fs::File::options()
+            .write(true)
+            .truncate(true)
+            .open(output_path.join(".ptx-builder.lock"))
+            .context("Unable to open the lockfile for the ptx-builder")?;
+        lock_file_inner
+            .write_all(example_name.as_bytes())
+            .context("Unable to write to the lockfile for the ptx-builder")?;
+        lock_file_inner
+            .flush()
+            .context("Unable to close the lockfile for the ptx-builder")?;
+        std::mem::drop(lock_file_inner);
 
         let mut reader = BufReader::new(
             std::fs::File::open(self.source_crate.get_path().join("Cargo.toml"))
@@ -326,9 +344,10 @@ impl Builder {
             .read_to_string(&mut old_cargo_toml)
             .context(BuildErrorKind::OtherError)?;
 
-        let new_cargo_toml = old_cargo_toml.replace(
+        let new_cargo_toml = old_cargo_toml.replace(&prior_example_name, &example_name);
+        let old_cargo_toml = old_cargo_toml.replace(
+            &prior_example_name,
             &format!("{}-ptx-builder", self.source_crate.get_name()),
-            &example_name,
         );
 
         let mut writer = std::io::BufWriter::new(
@@ -351,12 +370,6 @@ impl Builder {
         args.push("--crate-type");
         let crate_type = self.source_crate.get_crate_type(self.crate_type)?;
         args.push(crate_type);
-
-        let output_path = {
-            self.source_crate
-                .get_output_path()
-                .context("Unable to create output path")?
-        };
 
         cargo
             .with_args(&args)
@@ -398,7 +411,9 @@ impl Builder {
         writer.flush().context(BuildErrorKind::OtherError)?;
         std::mem::drop(writer);
 
-        std::mem::drop(lock);
+        lock_file
+            .unlock()
+            .context("Unable to unlock 'ptx-builder.lock'")?;
 
         Ok(BuildStatus::Success(self.prepare_output(
             output_path,

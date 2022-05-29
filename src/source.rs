@@ -71,8 +71,10 @@ impl Crate {
             }
         };
 
-        let is_library = path.join("src").join("lib.rs").exists();
-        let is_binary = path.join("src").join("main.rs").exists();
+        let is_library =
+            cargo_toml.get("lib").is_some() || path.join("src").join("lib.rs").exists();
+        let is_binary =
+            cargo_toml.get("bin").is_some() || path.join("src").join("main.rs").exists();
 
         let output_file_prefix = cargo_toml_name.replace('-', "_");
 
@@ -87,7 +89,9 @@ impl Crate {
 
             (false, false) => {
                 bail!(BuildErrorKind::InternalError(
-                    "Unable to find neither `lib.rs` nor `main.rs`".into()
+                    "Unable to find neither `src/lib.rs` nor `src/main.rs` \
+                    nor a [lib] nor [[bin]] section in `Cargo.toml`"
+                        .into()
                 ));
             }
         };
