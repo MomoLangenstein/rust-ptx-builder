@@ -336,7 +336,7 @@ impl Builder {
                     let lines = stderr
                         .trim_matches('\n')
                         .split('\n')
-                        .filter(|s| Self::output_is_not_verbose(*s))
+                        .filter(|s| Self::output_is_not_verbose(s))
                         .map(String::from)
                         .collect();
 

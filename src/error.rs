@@ -13,7 +13,6 @@ macro_rules! bail {
 #[derive(thiserror::Error)]
 pub struct Error {
     #[source]
-    #[backtrace]
     error: anyhow::Error,
     context: BuildErrorKind,
 }
