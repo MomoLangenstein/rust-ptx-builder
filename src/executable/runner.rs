@@ -134,7 +134,7 @@ impl<Ex: Executable> ExecutableRunner<Ex> {
 pub(crate) fn parse_executable_version<E: Executable>(executable: &E) -> Result<Version> {
     let mut command = Command::new(executable.get_name());
 
-    command.args(&["-V"]);
+    command.args(["-V"]);
 
     let raw_output = {
         command

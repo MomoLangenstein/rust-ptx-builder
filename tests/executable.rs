@@ -11,7 +11,7 @@ mod cargo {
     #[test]
     fn should_provide_output() {
         let output = ExecutableRunner::new(Cargo)
-            .with_args(&["rustc", "-q", "--", "--print", "crate-name"])
+            .with_args(["rustc", "-q", "--", "--print", "crate-name"])
             .with_cwd("tests/fixtures/sample-crate")
             .run();
 
@@ -22,7 +22,7 @@ mod cargo {
     #[test]
     fn should_check_exit_code() {
         let output = ExecutableRunner::new(Cargo)
-            .with_args(&["rustc", "-q", "--unknown-flag"])
+            .with_args(["rustc", "-q", "--unknown-flag"])
             .with_cwd("tests/fixtures/sample-crate")
             .run();
 
