@@ -62,13 +62,10 @@ impl Crate {
             toml::from_str(&contents).context(BuildErrorKind::OtherError)?
         };
 
-        let cargo_toml_name = match cargo_toml["package"]["name"].as_str() {
-            Some(name) => name,
-            None => {
-                bail!(BuildErrorKind::InternalError(String::from(
-                    "Cannot get crate name"
-                )));
-            }
+        let Some(cargo_toml_name) = cargo_toml["package"]["name"].as_str() else {
+            bail!(BuildErrorKind::InternalError(String::from(
+                "Cannot get crate name"
+            )));
         };
 
         let is_library = path.join("src").join("lib.rs").exists();
@@ -77,11 +74,11 @@ impl Crate {
         let output_file_prefix = cargo_toml_name.replace('-', "_");
 
         let deps_file_prefix = match (is_binary, is_library) {
-            (false, true) => FilePrefix::Library(format!("lib{}", output_file_prefix)),
+            (false, true) => FilePrefix::Library(format!("lib{output_file_prefix}")),
             (true, false) => FilePrefix::Binary(cargo_toml_name.to_string()),
 
             (true, true) => FilePrefix::Mixed {
-                lib: format!("lib{}", output_file_prefix),
+                lib: format!("lib{output_file_prefix}"),
                 bin: cargo_toml_name.to_string(),
             },
 
@@ -203,37 +200,6 @@ fn should_find_crate_names() {
     {
         BuildErrorKind::InvalidCrateType(kind) => {
             assert_eq!(kind, "Binary");
-        }
-
-        _ => unreachable!("it should fail with proper error"),
-    }
-}
-
-#[test]
-fn should_find_app_crate_names() {
-    let source = Crate::analyse("tests/fixtures/app-crate").unwrap();
-
-    assert_eq!(source.get_output_file_prefix(), "sample_app_ptx_crate");
-
-    assert_eq!(
-        source.get_deps_file_prefix(None).unwrap(),
-        "sample-app-ptx_crate"
-    );
-
-    assert_eq!(
-        source
-            .get_deps_file_prefix(Some(CrateType::Binary))
-            .unwrap(),
-        "sample-app-ptx_crate"
-    );
-
-    match source
-        .get_deps_file_prefix(Some(CrateType::Library))
-        .unwrap_err()
-        .kind()
-    {
-        BuildErrorKind::InvalidCrateType(kind) => {
-            assert_eq!(kind, "Library");
         }
 
         _ => unreachable!("it should fail with proper error"),

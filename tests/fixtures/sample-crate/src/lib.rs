@@ -1,3 +1,4 @@
+#![allow(internal_features)]
 #![feature(abi_ptx, core_intrinsics)]
 #![no_std]
 

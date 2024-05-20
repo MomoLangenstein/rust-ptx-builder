@@ -10,7 +10,7 @@ use regex::Regex;
 
 use crate::{
     error::{BuildErrorKind, Error, Result, ResultExt},
-    executable::{Cargo, ExecutableRunner, Linker},
+    executable::{Cargo, ExecutableRunner},
     source::Crate,
 };
 
@@ -249,9 +249,6 @@ impl Builder {
             return Ok(BuildStatus::NotNeeded);
         }
 
-        // Verify `ptx-linker` version.
-        ExecutableRunner::new(Linker).with_args(vec!["-V"]).run()?;
-
         let mut cargo = ExecutableRunner::new(Cargo);
         let mut args = vec!["rustc"];
 
@@ -372,8 +369,8 @@ impl Builder {
                 .trim_matches('\n')
                 .split('\n')
                 .find(|line| {
-                    line.contains(&format!("--crate-name {}", crate_name))
-                        && line.contains(&format!("--crate-type {}", crate_type))
+                    line.contains(&format!("--crate-name {crate_name}"))
+                        && line.contains(&format!("--crate-type {crate_type}"))
                 })
                 .map(|line| BuildCommand::Realtime(line.to_string()))
                 .or_else(|| Self::load_cached_build_command(&output_path, &self.prefix))
@@ -419,7 +416,7 @@ impl Builder {
     }
 
     fn load_cached_build_command(output_path: &Path, prefix: &str) -> Option<BuildCommand> {
-        match read_to_string(output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix))) {
+        match read_to_string(output_path.join(format!("{LAST_BUILD_CMD}.{prefix}"))) {
             Ok(contents) => Some(BuildCommand::Cached(contents)),
             Err(_) => None,
         }
@@ -427,7 +424,7 @@ impl Builder {
 
     fn store_cached_build_command(output_path: &Path, prefix: &str, command: &str) -> Result<()> {
         write(
-            output_path.join(format!("{}.{}", LAST_BUILD_CMD, prefix)),
+            output_path.join(format!("{LAST_BUILD_CMD}.{prefix}")),
             command.as_bytes(),
         )
         .context(BuildErrorKind::OtherError)?;
@@ -535,7 +532,7 @@ impl<'a> BuildOutput<'a> {
             .trim()
             .split(' ')
             .map(|item| PathBuf::from(item.trim()))
-            .chain(cargo_deps.into_iter())
+            .chain(cargo_deps)
             .collect())
     }
 

@@ -33,9 +33,6 @@ pub trait Executable {
 /// `cargo` command.
 pub struct Cargo;
 
-/// `ptx-linker` command.
-pub struct Linker;
-
 impl Executable for Cargo {
     fn get_name(&self) -> String {
         String::from("cargo")
@@ -61,23 +58,5 @@ impl Executable for Cargo {
             version.pre = semver::Prerelease::EMPTY;
             version
         })
-    }
-}
-
-impl Executable for Linker {
-    fn get_name(&self) -> String {
-        String::from("rust-ptx-linker")
-    }
-
-    fn get_verification_hint(&self) -> String {
-        String::from("You can install it with: 'cargo install ptx-linker'")
-    }
-
-    fn get_version_hint(&self) -> String {
-        String::from("You can update it with: 'cargo install -f ptx-linker'")
-    }
-
-    fn get_required_version(&self) -> Option<VersionReq> {
-        Some(VersionReq::parse(">= 0.9.0").unwrap())
     }
 }

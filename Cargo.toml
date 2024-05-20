@@ -1,9 +1,10 @@
 [package]
 name = "ptx-builder"
-version = "0.5.3"
-authors = ["Denys Zariaiev <denys.zariaiev@gmail.com>"]
+version = "0.6.0"
+authors = ["Denys Zariaiev <denys.zariaiev@gmail.com>", "Juniper Tyree <juniper.tyree@helsinki.fi>"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
+rust-version = "1.79" # nightly
 
 readme = "README.md"
 description = "NVPTX build helper"
@@ -28,8 +29,3 @@ libc = "0.2"
 
 [dev-dependencies]
 antidote = "1.0"
-
-[badges]
-appveyor = { repository = "denzp/rust-ptx-builder", branch = "master", service = "github" }
-travis-ci = { repository = "denzp/rust-ptx-builder", branch = "master" }
-maintenance = { status = "passively-maintained" }

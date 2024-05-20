@@ -3,45 +3,16 @@
 #![deny(warnings)]
 #![allow(clippy::useless_attribute)]
 
-//! `build.rs` helper crate for your CUDA experiments.
+//! # ptx-builder &emsp; [![CI Status]][workflow] [![MSRV]][repo] [![Rust Doc]][docs]
 //!
-//! It helps to automatically build device crate in both *single-source* and
-//! *separated-source* projects.
+//! [CI Status]: https://img.shields.io/github/actions/workflow/status/juntyr/rust-ptx-builder/ci.yml?branch=main
+//! [workflow]: https://github.com/juntyr/rust-ptx-builder/actions/workflows/ci.yml?query=branch%3Amain
 //!
-//! Features the crate provide:
-//! * Automatically notify Cargo about device crate sources, so it can reuild on
-//!   changes,
-//! * Provide output PTX assembly path to Rust via environment variable,
-//! * Rich reporting of device crate errors,
-//! * Hints and troubleshooting for missing tools.
+//! [MSRV]: https://img.shields.io/badge/MSRV-1.79.0--nightly-orange
+//! [repo]: https://github.com/juntyr/rust-ptx-builder
 //!
-//! # Usage
-//! Simply add the crate as `build-dependency`:
-//! ```text
-//! [build-dependencies]
-//! ptx-builder = "0.5"
-//! ```
-//!
-//! And start using it in `build.rs` script:
-//! ```no_run
-//! use ptx_builder::error::Result;
-//! use ptx_builder::prelude::*;
-//!
-//! fn main() -> Result<()> {
-//!     let builder = Builder::new(".")?;
-//!     CargoAdapter::with_env_var("KERNEL_PTX_PATH").build(builder);
-//! }
-//! ```
-//!
-//! Now, on the host-side, the PTX assembly can be loaded and used with your
-//! favorite CUDA driver crate:
-//! ```ignore
-//! use std::ffi::CString;
-//!
-//! let ptx = CString::new(include_str!(env!("KERNEL_PTX_PATH")))?;
-//!
-//! // use the assembly contents ...
-//! ```
+//! [Rust Doc]: https://img.shields.io/badge/docs-main-blue
+//! [docs]: https://juntyr.github.io/rust-ptx-builder/
 
 /// Error handling.
 #[macro_use]

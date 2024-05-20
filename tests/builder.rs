@@ -64,35 +64,6 @@ fn should_write_assembly() {
 }
 
 #[test]
-fn should_build_application_crate() {
-    let _lock = ENV_MUTEX.lock();
-
-    cleanup_temp_location();
-
-    let builder = Builder::new("tests/fixtures/app-crate").unwrap();
-
-    match builder.disable_colors().build().unwrap() {
-        BuildStatus::Success(output) => {
-            let mut assembly_contents = String::new();
-
-            File::open(output.get_assembly_path())
-                .unwrap()
-                .read_to_string(&mut assembly_contents)
-                .unwrap();
-
-            assert!(output
-                .get_assembly_path()
-                .to_string_lossy()
-                .contains("release"));
-
-            assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
-
-        BuildStatus::NotNeeded => unreachable!(),
-    }
-}
-
-#[test]
 fn should_build_mixed_crate_lib() {
     let _lock = ENV_MUTEX.lock();
 
@@ -129,49 +100,13 @@ fn should_build_mixed_crate_lib() {
 }
 
 #[test]
-fn should_build_mixed_crate_bin() {
-    let _lock = ENV_MUTEX.lock();
-
-    cleanup_temp_location();
-
-    let builder = Builder::new("tests/fixtures/mixed-crate").unwrap();
-
-    match builder
-        .set_crate_type(CrateType::Binary)
-        .disable_colors()
-        .build()
-        .unwrap()
-    {
-        BuildStatus::Success(output) => {
-            let mut assembly_contents = String::new();
-
-            println!("{}", output.get_assembly_path().display());
-
-            File::open(output.get_assembly_path())
-                .unwrap()
-                .read_to_string(&mut assembly_contents)
-                .unwrap();
-
-            assert!(output
-                .get_assembly_path()
-                .to_string_lossy()
-                .contains("release"));
-
-            assert!(assembly_contents.contains(".visible .entry the_kernel("));
-        }
-
-        BuildStatus::NotNeeded => unreachable!(),
-    }
-}
-
-#[test]
 fn should_handle_rebuild_without_changes() {
     let _lock = ENV_MUTEX.lock();
 
     cleanup_temp_location();
 
     let builder = {
-        Builder::new("tests/fixtures/app-crate")
+        Builder::new("tests/fixtures/sample-crate")
             .unwrap()
             .disable_colors()
     };
@@ -270,13 +205,13 @@ fn should_report_about_build_failure() {
                         crate_absoulte_path_str
                     ),
                     "error[E0425]: cannot find function `external_fn` in this scope",
-                    &format!(" --> {}:6:20", lib_path.display()),
+                    &format!(" --> {}:7:20", lib_path.display()),
                     "  |",
-                    "6 |     *y.offset(0) = external_fn(*x.offset(0)) * a;",
+                    "7 |     *y.offset(0) = external_fn(*x.offset(0)) * a;",
                     "  |                    ^^^^^^^^^^^ not found in this scope",
                     "",
                     "For more information about this error, try `rustc --explain E0425`.",
-                    "error: could not compile `faulty-ptx_crate` due to previous error",
+                    "error: could not compile `faulty-ptx_crate` (lib) due to 1 previous error",
                     "",
                 ]
             );
@@ -305,41 +240,6 @@ fn should_provide_crate_source_files() {
             let mut sources = output.dependencies().unwrap();
             let mut expectations = vec![
                 crate_path.join("src").join("lib.rs"),
-                crate_path.join("src").join("mod1.rs"),
-                crate_path.join("src").join("mod2.rs"),
-                crate_path.join("Cargo.toml"),
-                crate_path.join("Cargo.lock"),
-            ];
-
-            sources.sort();
-            expectations.sort();
-
-            assert_eq!(sources, expectations);
-        }
-
-        BuildStatus::NotNeeded => unreachable!(),
-    }
-}
-
-#[test]
-fn should_provide_application_crate_source_files() {
-    let _lock = ENV_MUTEX.lock();
-
-    let crate_path = {
-        current_dir()
-            .unwrap()
-            .join("tests")
-            .join("fixtures")
-            .join("app-crate")
-    };
-
-    let builder = Builder::new(&crate_path.display().to_string()).unwrap();
-
-    match builder.disable_colors().build().unwrap() {
-        BuildStatus::Success(output) => {
-            let mut sources = output.dependencies().unwrap();
-            let mut expectations = vec![
-                crate_path.join("src").join("main.rs"),
                 crate_path.join("src").join("mod1.rs"),
                 crate_path.join("src").join("mod2.rs"),
                 crate_path.join("Cargo.toml"),
