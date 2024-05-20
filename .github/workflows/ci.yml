@@ -20,6 +20,7 @@ jobs:
         os: [ubuntu-latest]
         rust: [nightly]
 
+    steps:
       - name: Checkout the Repository
         uses: actions/checkout@v2
       
@@ -95,8 +96,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           profile: minimal
-          components: clippy
-          components: llvm-bitcode-linker, llvm-tools
+          components: clippy, llvm-bitcode-linker, llvm-tools
           override: true
 
       - name: Check all workspace targets
