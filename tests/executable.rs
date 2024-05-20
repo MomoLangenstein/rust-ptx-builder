@@ -24,6 +24,7 @@ mod cargo {
         let output = ExecutableRunner::new(Cargo)
             .with_args(["rustc", "-q", "--unknown-flag"])
             .with_cwd("tests/fixtures/sample-crate")
+            .with_env("CARGO_TERM_COLOR", "never")
             .run();
 
         match output.unwrap_err().kind() {
@@ -34,8 +35,6 @@ mod cargo {
             } => {
                 assert_eq!(command, "cargo");
                 assert_eq!(*code, 1);
-
-                println!("{stderr}");
 
                 assert!(stderr.contains("argument '--unknown-flag'"));
             }
