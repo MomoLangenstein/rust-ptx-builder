@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BuildStatus","CrateType","MessageFormat","Profile"],"struct":["BuildOutput","Builder"]};

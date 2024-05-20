@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["runner"],"struct":["Cargo"],"trait":["Executable"]};
