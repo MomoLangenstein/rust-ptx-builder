@@ -35,6 +35,8 @@ mod cargo {
                 assert_eq!(command, "cargo");
                 assert_eq!(*code, 1);
 
+                println!("{stderr}");
+
                 assert!(stderr.contains("argument '--unknown-flag'"));
             }
 

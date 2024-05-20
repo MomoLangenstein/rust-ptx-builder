@@ -233,7 +233,7 @@ fn should_provide_crate_source_files() {
             .join("sample-crate")
     };
 
-    let builder = Builder::new(&crate_path.display().to_string()).unwrap();
+    let builder = Builder::new(crate_path.display().to_string()).unwrap();
 
     match builder.disable_colors().build().unwrap() {
         BuildStatus::Success(output) => {
