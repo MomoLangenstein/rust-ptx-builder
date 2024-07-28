@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/builder.rs`."><title>builder.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ptx_builder" data-themes="" data-resource-suffix="" data-rustdoc-version="1.80.0-nightly (d84b90375 2024-05-19)" data-channel="nightly" data-search-js="search-d52510db62a78183.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/builder.rs`."><title>builder.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-5ca6ca2a1f83705a.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ptx_builder" data-themes="" data-resource-suffix="" data-rustdoc-version="1.82.0-nightly (fbccf5053 2024-07-27)" data-channel="nightly" data-search-js="search-ef54e092fea9c776.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-d2fab2bf619172d3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -584,14 +584,33 @@
 <a href="#584" id="584">584</a>
 <a href="#585" id="585">585</a>
 <a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
-    env, fmt,
+    collections::HashMap,
+    env,
+    ffi::OsString,
+    fmt,
     fs::{read_to_string, write, File},
     io::{BufReader, Read},
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
-<span class="kw">use </span>lazy_static::lazy_static;
 <span class="kw">use </span>regex::Regex;
 
 <span class="kw">use crate</span>::{
@@ -613,6 +632,8 @@
     crate_type: <span class="prelude-ty">Option</span>&lt;CrateType&gt;,
     message_format: MessageFormat,
     prefix: String,
+
+    env: HashMap&lt;OsString, OsString&gt;,
 }
 
 <span class="doccomment">/// Successful build output.
@@ -754,6 +775,7 @@
             crate_type: <span class="prelude-val">None</span>,
             message_format: MessageFormat::Human,
             prefix: String::new(),
+            env: HashMap::new(),
         })
     }
 
@@ -815,6 +837,13 @@
     </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>set_prefix(<span class="kw-2">mut </span><span class="self">self</span>, prefix: String) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.prefix = prefix;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Inserts or updates an environment variable for the build process.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>with_env&lt;K: Into&lt;OsString&gt;, V: Into&lt;OsString&gt;&gt;(<span class="kw-2">mut </span><span class="self">self</span>, key: K, val: V) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.env.insert(key.into(), val.into());
         <span class="self">self
     </span>}
 
@@ -907,6 +936,10 @@
             .with_env(<span class="string">"PTX_CRATE_BUILDING"</span>, <span class="string">"1"</span>)
             .with_env(<span class="string">"CARGO_TARGET_DIR"</span>, output_path.clone());
 
+        <span class="kw">for </span>(key, val) <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.env {
+            cargo.with_env(key, val);
+        }
+
         <span class="kw">let </span>cargo_output = cargo
             .run_live(on_stdout_line, |line| {
                 <span class="kw">if </span><span class="self">Self</span>::output_is_not_verbose(line) {
@@ -941,10 +974,9 @@
         cargo_stderr: <span class="kw-2">&amp;</span>str,
         crate_type: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;BuildOutput&gt; {
-        <span class="macro">lazy_static!</span> {
-            <span class="kw">static </span><span class="kw-2">ref </span>SUFFIX_REGEX: Regex =
-                Regex::new(<span class="string">r"-C extra-filename=([\S]+)"</span>).expect(<span class="string">"Unable to parse regex..."</span>);
-        }
+        <span class="kw">static </span>SUFFIX_REGEX: LazyLock&lt;Regex&gt; = LazyLock::new(|| {
+            Regex::new(<span class="string">r"-C extra-filename=([\S]+)"</span>).expect(<span class="string">"Unable to parse regex..."</span>)
+        });
 
         <span class="kw">let </span>crate_name = <span class="self">self</span>.source_crate.get_output_file_prefix();
 
