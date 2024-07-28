@@ -4,7 +4,7 @@ version = "0.6.0"
 authors = ["Denys Zariaiev <denys.zariaiev@gmail.com>", "Juniper Tyree <juniper.tyree@helsinki.fi>"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.79" # nightly
+rust-version = "1.80" # nightly
 
 readme = "README.md"
 description = "NVPTX build helper"
@@ -24,7 +24,6 @@ colored = "2.0"
 toml = "0.8"
 semver = "1.0"
 regex = "1.5"
-lazy_static = "1.4"
 libc = "0.2"
 
 [dev-dependencies]

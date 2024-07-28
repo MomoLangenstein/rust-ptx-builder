@@ -1,11 +1,14 @@
 use std::{
-    env, fmt,
+    collections::HashMap,
+    env,
+    ffi::OsString,
+    fmt,
     fs::{read_to_string, write, File},
     io::{BufReader, Read},
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
-use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::{
@@ -27,6 +30,8 @@ pub struct Builder {
     crate_type: Option<CrateType>,
     message_format: MessageFormat,
     prefix: String,
+
+    env: HashMap<OsString, OsString>,
 }
 
 /// Successful build output.
@@ -168,6 +173,7 @@ impl Builder {
             crate_type: None,
             message_format: MessageFormat::Human,
             prefix: String::new(),
+            env: HashMap::new(),
         })
     }
 
@@ -229,6 +235,13 @@ impl Builder {
     #[must_use]
     pub fn set_prefix(mut self, prefix: String) -> Self {
         self.prefix = prefix;
+        self
+    }
+
+    /// Inserts or updates an environment variable for the build process.
+    #[must_use]
+    pub fn with_env<K: Into<OsString>, V: Into<OsString>>(mut self, key: K, val: V) -> Self {
+        self.env.insert(key.into(), val.into());
         self
     }
 
@@ -321,6 +334,10 @@ impl Builder {
             .with_env("PTX_CRATE_BUILDING", "1")
             .with_env("CARGO_TARGET_DIR", output_path.clone());
 
+        for (key, val) in &self.env {
+            cargo.with_env(key, val);
+        }
+
         let cargo_output = cargo
             .run_live(on_stdout_line, |line| {
                 if Self::output_is_not_verbose(line) {
@@ -355,10 +372,9 @@ impl Builder {
         cargo_stderr: &str,
         crate_type: &str,
     ) -> Result<BuildOutput> {
-        lazy_static! {
-            static ref SUFFIX_REGEX: Regex =
-                Regex::new(r"-C extra-filename=([\S]+)").expect("Unable to parse regex...");
-        }
+        static SUFFIX_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"-C extra-filename=([\S]+)").expect("Unable to parse regex...")
+        });
 
         let crate_name = self.source_crate.get_output_file_prefix();
 

@@ -1,19 +1,16 @@
 use std::{
-    env,
-    env::current_dir,
+    env::{self, current_dir},
     fs::{remove_dir_all, File},
     io::prelude::*,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 use antidote::Mutex;
-use lazy_static::*;
 
 use ptx_builder::{error::*, prelude::*};
 
-lazy_static! {
-    static ref ENV_MUTEX: Mutex<()> = Mutex::new(());
-}
+static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[test]
 fn should_provide_output_path() {
